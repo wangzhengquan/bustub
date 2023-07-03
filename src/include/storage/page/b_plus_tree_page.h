@@ -24,7 +24,6 @@ namespace bustub {
 
 #define INDEX_TEMPLATE_ARGUMENTS template <typename KeyType, typename ValueType, typename KeyComparator>
 
-#define B_PLUS_TREE_PAGE_TYPE BPlusTreePage<KeyType, ValueType, KeyComparator>
 
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTree ;
@@ -44,9 +43,8 @@ enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE };
  * | ParentPageId (4) | PageId(4) |
  * ----------------------------------------------------------------------------
  */
-INDEX_TEMPLATE_ARGUMENTS
 class BPlusTreePage {
-  // INDEX_TEMPLATE_ARGUMENTS
+  INDEX_TEMPLATE_ARGUMENTS
   friend class BPlusTree;
  public:
   auto IsLeafPage() const -> bool;

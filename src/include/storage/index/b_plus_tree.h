@@ -80,7 +80,7 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
-  void InsertInParent(BPlusTreePage *page_l,const KeyType &key, BPlusTreePage * page_r);
+  void InsertInParent(const KeyType &keyl, BPlusTreePage *page_l, const KeyType &key, BPlusTreePage * page_r);
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;

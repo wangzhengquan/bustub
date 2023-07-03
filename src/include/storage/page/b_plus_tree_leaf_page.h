@@ -51,7 +51,8 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   auto ValueAt(int index) const -> ValueType;
-  inline auto At(int index)  const -> MappingType&;
+  inline auto At(int index) -> MappingType&;
+  inline auto At(int index) const -> const MappingType&;
   void SetAt(int index, const KeyType &key, const ValueType &value);
   // auto Find(const KeyType &key, ValueType &value, const KeyComparator &comparator) const -> bool;
   auto IndexOfKey(const KeyType &key,  const KeyComparator &comparator) const -> int;
@@ -59,7 +60,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
   void InsertAt(const KeyType &key, const ValueType &value, int i) ;
   void Append(const KeyType &key, const ValueType &value);
-  void Coalesce(const BPlusTreeLeafPage &other, const KeyComparator &comparator);
+  void Coalesce(BPlusTreeLeafPage * other, const KeyComparator &comparator);
   void RemoveAt(int i) ;
  private:
   page_id_t next_page_id_;
@@ -70,7 +71,13 @@ class BPlusTreeLeafPage : public BPlusTreePage {
 
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) const  -> MappingType& {
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index)  -> MappingType& {
+  BUSTUB_ASSERT(index < GetSize(), "invalid index ");
+  return array_[index];
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) const -> const MappingType& {
   BUSTUB_ASSERT(index < GetSize(), "invalid index ");
   return array_[index];
 }

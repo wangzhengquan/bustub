@@ -48,13 +48,14 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   void SetKeyAt(int index, const KeyType &key);
   auto ValueAt(int index) const -> ValueType;
   void SetValueAt(int index, const ValueType &value);
-  inline auto At(int index) const -> MappingType&;
+  inline auto At(int index) -> MappingType&;
+  inline auto At(int index) const -> const MappingType&;
   auto IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int;
   auto Insert(const MappingType &pair, const KeyComparator &comparator) -> bool;
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
   void InsertAt(const KeyType &key, const ValueType &value, int i);
   void Append(const KeyType &key, const ValueType &value);
-  void Coalesce(const BPlusTreeInternalPage &other, const KeyComparator &comparator);
+  void Coalesce(BPlusTreeInternalPage *other, const KeyComparator &comparator);
   void RemoveAt(int i) ;
  private:
   // Flexible array member for page data.
@@ -63,7 +64,13 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::At(int index) const -> MappingType& {
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::At(int index) -> MappingType& {
+  BUSTUB_ASSERT(index < GetSize(), "invalid index ");
+  return array_[index];
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::At(int index) const -> const MappingType& {
   BUSTUB_ASSERT(index < GetSize(), "invalid index ");
   return array_[index];
 }

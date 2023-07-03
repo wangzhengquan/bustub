@@ -79,13 +79,13 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexOfKey(const KeyType &key, const KeyCom
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const MappingType &pair, const KeyComparator &comparator) -> bool{
-  return InsertAt(pair.first, pair.second, comparator);
+  return Insert(pair.first, pair.second, comparator);
 }
  
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool{
-  int i = IndexOfKey(key);
+  int i = IndexOfKey(key, comparator);
   InsertAt(key, value, i);
   return true;
 }
@@ -110,35 +110,18 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Append(const KeyType &key, const ValueType 
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(const B_PLUS_TREE_INTERNAL_PAGE_TYPE &other, const KeyComparator &comparator) {
-  int other_size = other.GetSize();
-  BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range"); 
-  if(size_ == 1){
-    std::copy(&other.array_[0], &other.array_[other.GetSize()], &array_[0]);
-  }   
-  else if(comparator(other.GetKeyAt(0), GetKeyAt(size_-1)) > 0 ){
-    std::copy(&other.array_[0], &other.array_[other.GetSize()], &array_[size_]);
-  } else if (comparator(other.GetKeyAt(other_size-1), GetKeyAt(0)) < 0 ) {
-    std::copy(&array_[1], &array_[size_], &array_[other.GetSize()]);
-    std::copy(&other.array_[0], &other.array_[other.GetSize()], &array_[0]);
-  }
-  size_ += other.GetSize();
-}
-
-
-INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(const B_PLUS_TREE_INTERNAL_PAGE_TYPE &other, const KeyComparator &comparator) {
-  int other_size = other.GetSize();
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(B_PLUS_TREE_INTERNAL_PAGE_TYPE *other, const KeyComparator &comparator) {
+  int other_size = other->GetSize();
   BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range"); 
   if(size_ == 0){
-    std::copy(&other.array_[0], &other.array_[other_size], &array_[0]);
+    std::copy(&other->array_[0], &other->array_[other_size], &array_[0]);
   }   
-  else if(comparator(other.GetKeyAt(0), GetKeyAt(size_-1)) > 0 ){
-    std::copy(&other.array_[0], &other.array_[other_size], &array_[size_]);
+  else if(comparator(other->KeyAt(0), KeyAt(size_-1)) > 0 ){
+    std::copy(&other->array_[0], &other->array_[other_size], &array_[size_]);
   } 
-  else if (comparator(other.GetKeyAt(other_size-1), GetKeyAt(0)) < 0 ) {
-    std::copy(&array_[0], &array_[size_], &other.array_[other_size]);
-    std::copy(&other.array_[0], &other.array_[size_+other_size], &array_[0]);
+  else if (comparator(other->KeyAt(other_size-1), KeyAt(0)) < 0 ) {
+    std::copy(&array_[0], &array_[size_], &other->array_[other_size]);
+    std::copy(&other->array_[0], &other->array_[size_+other_size], &array_[0]);
   }
   size_ += other_size;
 }
