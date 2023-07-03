@@ -33,7 +33,12 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::IsEmpty() const -> bool { 
   // HeaderPage *header_page = static_cast<HeaderPage *>(buffer_pool_manager_->FetchPage(HEADER_PAGE_ID));
   // header_page->GetRootId(index_name_, &root_page_id_);
-  return root_page_id_ == INVALID_PAGE_ID; 
+  if(root_page_id_ == INVALID_PAGE_ID) {
+    return true;
+  } 
+
+  BPlusTreePage * page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
+  return page->GetSize() == 0;
 }
 /*****************************************************************************
  * SEARCH
@@ -70,20 +75,21 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key) -> LeafPage* {
   BPlusTreePage *cur_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
   while(!cur_page->IsLeafPage()){
     InternalPage * cur_inter_page = static_cast<InternalPage* >(cur_page);
-    int i = 1;
-    while(i < cur_inter_page->GetSize() ) {
-      auto cmp = comparator_(key, cur_inter_page->array_[i].first) ;
-      if(cmp == -1 )
-        break;
-      else if(cmp == 0){
-        i++;
-        break;
-      }
-      else i++;
-    }
-
+    // int i = 1;
+    // while(i < cur_inter_page->GetSize() ) {
+    //   auto cmp = comparator_(key, cur_inter_page->array_[i].first) ;
+    //   if(cmp == -1 )
+    //     break;
+    //   else if(cmp == 0){
+    //     i++;
+    //     break;
+    //   }
+    //   else i++;
+    // }
+    int i = cur_inter_page->IndexOfKey(key);
+    page_id_t page_id = cur_inter_page->ValueAt(i);
     buffer_pool_manager_->UnpinPage(cur_page->GetPageId(), false);
-    page_id_t page_id = cur_inter_page->ValueAt(i-1);
+   
     cur_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id)->GetData());
   }
 
@@ -147,7 +153,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     // buffer_pool_manager_->UnpinPage(page_l->GetPageId(), true);
     // buffer_pool_manager_->FlushPage(page_r->GetPageId());
     // buffer_pool_manager_->UnpinPage(page_r->GetPageId(), true);
-    InsertInParent(page_l, page_r->KeyAt(0), page_r);
+    InsertInParent( page_l, page_r->KeyAt(0), page_r);
 
   }
   
@@ -157,14 +163,15 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertInParent(BPlusTreePage *page_l,const KeyType &key, BPlusTreePage * page_r){
   if(page_l->IsRootPage()){
+    
     InternalPage * root_page  = reinterpret_cast<InternalPage *>(buffer_pool_manager_->NewPage(&root_page_id_)->GetData());
     root_page->Init(root_page_id_, INVALID_PAGE_ID, internal_max_size_);
     page_l->SetParentPageId(root_page_id_);
     page_r->SetParentPageId(root_page_id_);
-    root_page->SetValueAt(0, page_l->GetPageId());  
+    root_page->Insert(page_l->KeyAt(0), page_l->GetPageId(), comparator_);  
     root_page->Insert(key, page_r->GetPageId(), comparator_);
 // std::cout << "root_page_id_ = " << root_page_id_ << ",page_l= " << page_l->GetPageId() << ",page_r= " << page_r->GetPageId() << std::endl;
-    UpdateRootPageId(1);
+    UpdateRootPageId(0);
     buffer_pool_manager_->UnpinPage(root_page_id_, true);
     return;
   }
@@ -210,130 +217,154 @@ void BPLUSTREE_TYPE::InsertInParent(BPlusTreePage *page_l,const KeyType &key, BP
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
-//   LeafPage *leaf_page = Find(key);
-//   if(leaf_page == nullptr)
-//     return ;
+  LeafPage *leaf_page = Find(key);
+  if(leaf_page == nullptr)
+    return ;
 
-//   int i = leaf_page->IndexOfKey(key, comparator_) ;
-//   if(i == -1){
-//     buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
-//     return;
-//   }  
-
-//  // ValueType &value = leaf_page->ValueAt(i);
-//   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
-//   return ;
-
-
-  if(IsEmpty()) 
-    return nullptr;
-
-  BPlusTreePage *cur_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
-  while(!cur_page->IsLeafPage()){
-    InternalPage * cur_inter_page = static_cast<InternalPage* >(cur_page);
-
-    for(int i = cur_inter_page->GetSize() - 1; i >= 0 && comparator_(key, cur_inter_page->array_[i].first) == -1; i--)
-      ;
-
-    // buffer_pool_manager_->UnpinPage(cur_page->GetPageId(), false);
-   
-  }
-
-  if(cur_page->IsLeafPage()) {
-    LeafPage * cur_leaf_page = static_cast<LeafPage * >(cur_page);
-    return cur_leaf_page;
-  }
-  
+  int i = leaf_page->IndexOfKey(key, comparator_) ;
+  if(i == -1){
+    buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
+    return;
+  }  
+  RemoveAt(leaf_page, i);
+  buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
+  return ;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::Remove(const KeyType &key, const InternalPage *parent_page, const int index){
-  // LeafPage * leaf_page ;
-  // InternalPage * inter_page;
-  // int min = static_cast<int>(floor(static_cast<double>(page->GetMaxSize()-1)/2)); 
-  // if(page->IsLeafPage()){
-  //   leaf_page = static_cast<LeafPage* >(page);
-  //   leaf_page->RemoveAt(index);
-  // } else {
-  //   inter_page = static_cast<InternalPage* >(page);
-  //   inter_page->RemoveAt(index);
-  // }
-
-  // if(page->IsRootPage() && page->GetSize() == 1){
-  // }
-  int min = static_cast<int>(floor(static_cast<double>(parent_page->GetMaxSize()-2)/2));  
-  BPlusTreePage * left_page, * right_page;
-  BPlusTreePage * page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(index))->GetData());
-  if(index+1 < parent_page->GetSize()){
-    right_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(index+1))->GetData());
-  }
-  if(index-1 >=0 ){
-    left_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(index-1))->GetData());
-  }
-
-  if(page->GetSize() > min){
+void BPLUSTREE_TYPE::RemoveAt(BPlusTreePage * page, int index, const KeyType &key){
+  if(page->IsRootPage()){
+    if(page->IsLeafPage() ){
+      LeafPage * m_page = static_cast<LeafPage *>(page);
+      m_page->RemoveAt(index);
+    } else {
+      InternalPage * m_page = static_cast<InternalPage *>(page);
+      m_page->RemoveAt(index);
+      if(m_page->GetSize()==1){
+        root_page_id_ = m_page->ValueAt(0);
+        UpdateRootPageId(0);
+        buffer_pool_manager_->DeletePage(m_page->GetPageId());
+      }
+    }
     return;
   }
-  
+
+  InternalPage *parent_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(page->GetParentPageId() )->GetData());
+  int indexOfPage = parent_page.indexOf(key);
+
   if(page->IsLeafPage() ){
     LeafPage * l_page, * r_page;
     LeafPage * m_page = static_cast<LeafPage * >(page);
-    int i = m_page->IndexOfKey(key);
-    if(i == -1) return;
-    m_page->RemoveAt(i);
+    int min = static_cast<int>(floor(static_cast<double>(parent_page->GetMaxSize()-1)/2)); 
+    m_page->RemoveAt(index);
+    if(m_page->GetSize() >= min){
+      return;
+    }
+
+    if(indexOfPage+1 < parent_page->GetSize()){
+      r_page = reinterpret_cast<LeafPage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(indexOfPage+1))->GetData());
+    }
+    if(indexOfPage-1 >=0 ){
+      l_page = reinterpret_cast<LeafPage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(indexOfPage-1))->GetData());
+    }
       
     if(l_page != nullptr && l_page->GetSize() > min){
       // borrow from left
-      m_page->Insert(l_page->At(l_page->GetSize()-1));
+      m_page->Insert(l_page->At(l_page->GetSize()-1), comparator_);
       l_page->RemoveAt(l_page->GetSize()-1);
-      parent_page->SetKeyAt(i, m_page->GetKeyAt(0));
-     // parent_page->SetKeyAt(i-1, l_page->GetKeyAt(0));
+      parent_page->SetKeyAt(indexOfPage, m_page->GetKeyAt(0));
 
     }
     else if(r_page != nullptr && r_page->GetSize() > min){
       // borrow from right
-      m_page->Insert(r_page->At(0));
+      m_page->Insert(r_page->At(0), comparator_);
       r_page->RemoveAt(0);
-      parent_page->SetKeyAt(i, m_page->GetKeyAt(0));
-      parent_page->SetKeyAt(i+1, r_page->GetKeyAt(0));
+      // if the original minest key was the one which is removed
+      parent_page->SetKeyAt(indexOfPage, m_page->GetKeyAt(0));
+      parent_page->SetKeyAt(indexOfPage+1, r_page->GetKeyAt(0));
 
     } else {
       // coalesce
       if(l_page == nullptr){
-        // 合并到右边
+       
+        // r_page->coalesce(m_page);
+        // parent_page->SetKeyAt(indexOfPage+1, r_page->GetKeyAt(0));
+        // buffer_pool_manager_->DeletePage(m_page->GetPageId());
+        // RemoveAt(parent_page, indexOfPage, key);
+
+        m_page->coalesce(r_page);
+        m_page->SetNextPageId(r_page->GetNextPageId());
+        buffer_pool_manager_->DeletePage(r_page->GetPageId());
+        RemoveAt(parent_page, indexOfPage+1, key);
+        
+      } else if(r_page == nullptr){
+        l_page->coalesce(m_page);
+        l_page->SetNextPageId(m_page->GetNextPageId());
+        buffer_pool_manager_->DeletePage(m_page->GetPageId());
+        RemoveAt(parent_page, indexOfPage, key);
+      } else {
+        // coalesce m to left
+        l_page->coalesce(m_page);
+        l_page->SetNextPageId(m_page->GetNextPageId());
+        buffer_pool_manager_->DeletePage(m_page->GetPageId());
+        RemoveAt(parent_page, indexOfPage, key);
       }
 
     }
   } else {
+    // === internal page===
     InternalPage * l_page, * r_page;
     InternalPage * m_page = static_cast<InternalPage *>(page);
-    if(l_page != nullptr && l_page->GetSize() > min){
+    int min = static_cast<int>(floor(static_cast<double>(parent_page->GetMaxSize()-2)/2)); 
 
-    } else if(r_page != nullptr && r_page->GetSize() > min){
-      // borrow from right
-      m_page->Insert(r_page->At(0));
-      r_page->RemoveAt(0);
-      parent_page->SetKeyAt(i, m_page->GetKeyAt(0));
-      parent_page->SetKeyAt(i+1, r_page->GetKeyAt(0));
-
-
-      // KeyType tmp_key = parent_page.GetKeyAt(1);
-      for(int i = 0; i < parent_page->GetSize()-1; i++) {
-        parent_page->array_[i] = parent_page->array_[i+1];
-      }
-      parent_page->array_[parent_page->GetSize()-1] = r_page->GetKeyAt(1);
-      r_page->SetKeyAt(0,  parent_page.GetKeyAt(0));
-      m_page->Append(r_page->At(0));
-      r_page->RemoveAt(0);
-
-    } else {
-
+    m_page->RemoveAt(index);
+    if(m_page->GetSize() >= min){
+      return;
+    }
+    if(indexOfPage+1 < parent_page->GetSize()){
+      r_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(indexOfPage+1))->GetData());
+    }
+    if(indexOfPage-1 >=0 ){
+      l_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_page->ValueAt(indexOfPage-1))->GetData());
     }
 
+    if(l_page != nullptr && l_page->GetSize() > min){
+      
+      // borrow from left
+      m_page->Insert(l_page->At(l_page->GetSize()-1), comparator_);
+      l_page->RemoveAt(l_page->GetSize()-1);
+      parent_page->SetKeyAt(indexOfPage, m_page->GetKeyAt(0));
+    }
+    else if(r_page != nullptr && r_page->GetSize() > min){
+      // borrow from right
+      // move the first item in the right to m_page
+      // r_page->SetKeyAt(0, parent_page->KeyAt(indexOfPage+1));
+      m_page->Insert(r_page->At(0), comparator_);
+      r_page->RemoveAt(0);
+      parent_page->SetKeyAt(indexOfPage, m_page->GetKeyAt(0));
+      parent_page->SetKeyAt(indexOfPage+1, r_page->GetKeyAt(0));
+    } else {
+      // coalesce
+      if(l_page == nullptr){
+        m_page->coalesce(r_page);
+       // m_page->SetNextPageId(r_page->GetNextPageId());
+        buffer_pool_manager_->DeletePage(r_page->GetPageId());
+        RemoveAt(parent_page, indexOfPage+1, key);
+      } else if(r_page == nullptr){
+        l_page->coalesce(m_page);
+        //l_page->SetNextPageId(m_page->GetNextPageId());
+        buffer_pool_manager_->DeletePage(m_page->GetPageId());
+        RemoveAt(parent_page, indexOfPage, key);
+         
+      } else {
+        l_page->coalesce(m_page);
+        //l_page->SetNextPageId(m_page->GetNextPageId());
+        buffer_pool_manager_->DeletePage(m_page->GetPageId());
+        RemoveAt(parent_page, indexOfPage, key);
+      }
+
+    }
   }
-  
-  return nullptr;
-    
 }
 
 /*****************************************************************************

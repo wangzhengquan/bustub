@@ -41,14 +41,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType {
   // replace with your own code
-  // the first key is set to be invalid, and lookup methods should always start with the second key.
-  //index >0 &&
-  // if(index >= GetSize()){
-  //   std::cout << index << std::endl;
-  // }
-
   BUSTUB_ASSERT( index < GetSize(), "invalid index ");  
-  return array_[index].first ;
+  return At(index).first ;
 }
 
 /*
@@ -56,12 +50,8 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType {
  * offset)
  */
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType { 
-  // if(index >= GetSize()){
-  //   std::cout << index << std::endl;
-  // }
-  BUSTUB_ASSERT(index < GetSize(), "invalid index ");  
-  return array_[index].second; 
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType {    
+  return At(index).second; 
 }
 
 
@@ -80,11 +70,22 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &valu
 
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool{
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int { 
+  int i;
+  for(i = GetSize() - 1; i > 0 && comparator(key, array_[i].first) == -1; i--)
+      ;
+  return i;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const MappingType &pair, const KeyComparator &comparator) -> bool{
+  return InsertAt(pair.first, pair.second, comparator);
+}
  
-  int i = 1;
-  for( i = 1; i < size_ && comparator(key, array_[i].first) > 0; i++) ;
-  
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool{
+  int i = IndexOfKey(key);
   InsertAt(key, value, i);
   return true;
 }
@@ -112,16 +113,34 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(const B_PLUS_TREE_INTERNAL_PAGE_TYPE &other, const KeyComparator &comparator) {
   int other_size = other.GetSize();
   BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range"); 
-  if(size_ == 0){
-    std::copy(&other.array_[0], &other.array_[size_], &array_[0]);
+  if(size_ == 1){
+    std::copy(&other.array_[0], &other.array_[other.GetSize()], &array_[0]);
   }   
   else if(comparator(other.GetKeyAt(0), GetKeyAt(size_-1)) > 0 ){
-    std::copy(&other.array_[0], &other.array_[size_], &array_[size_]);
+    std::copy(&other.array_[0], &other.array_[other.GetSize()], &array_[size_]);
   } else if (comparator(other.GetKeyAt(other_size-1), GetKeyAt(0)) < 0 ) {
-    std::copy(&array_[0], &array_[size_], &array_[size_]);
-    std::copy(&other.array_[0], &other.array_[size_], &array_[0]);
+    std::copy(&array_[1], &array_[size_], &array_[other.GetSize()]);
+    std::copy(&other.array_[0], &other.array_[other.GetSize()], &array_[0]);
   }
   size_ += other.GetSize();
+}
+
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(const B_PLUS_TREE_INTERNAL_PAGE_TYPE &other, const KeyComparator &comparator) {
+  int other_size = other.GetSize();
+  BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range"); 
+  if(size_ == 0){
+    std::copy(&other.array_[0], &other.array_[other_size], &array_[0]);
+  }   
+  else if(comparator(other.GetKeyAt(0), GetKeyAt(size_-1)) > 0 ){
+    std::copy(&other.array_[0], &other.array_[other_size], &array_[size_]);
+  } 
+  else if (comparator(other.GetKeyAt(other_size-1), GetKeyAt(0)) < 0 ) {
+    std::copy(&array_[0], &array_[size_], &other.array_[other_size]);
+    std::copy(&other.array_[0], &other.array_[size_+other_size], &array_[0]);
+  }
+  size_ += other_size;
 }
 
 

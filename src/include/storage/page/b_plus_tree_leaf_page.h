@@ -51,10 +51,11 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   auto ValueAt(int index) const -> ValueType;
-  auto At(int index) -> MappingType&;
+  inline auto At(int index)  const -> MappingType&;
   void SetAt(int index, const KeyType &key, const ValueType &value);
   // auto Find(const KeyType &key, ValueType &value, const KeyComparator &comparator) const -> bool;
   auto IndexOfKey(const KeyType &key,  const KeyComparator &comparator) const -> int;
+  auto Insert(const MappingType &pair, const KeyComparator &comparator) -> bool;
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
   void InsertAt(const KeyType &key, const ValueType &value, int i) ;
   void Append(const KeyType &key, const ValueType &value);
@@ -65,4 +66,13 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   // Flexible array member for page data.
   MappingType array_[1];
 };
+
+
+
+INDEX_TEMPLATE_ARGUMENTS
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) const  -> MappingType& {
+  BUSTUB_ASSERT(index < GetSize(), "invalid index ");
+  return array_[index];
+}
+
 }  // namespace bustub

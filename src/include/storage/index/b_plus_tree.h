@@ -57,6 +57,7 @@ class BPlusTree {
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
   auto Find(const KeyType &key) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
 
+  void RemoveAt(BPlusTreePage * page, int index, const KeyType &key);
   // return the page id of the root node
   auto GetRootPageId() -> page_id_t;
 
