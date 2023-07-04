@@ -132,7 +132,7 @@ void BPLUSTREE_TYPE::LeafPageInsert(LeafPage * page, const KeyType &key, const V
   page_id_t page_r_id;
   LeafPage * page_r = reinterpret_cast<LeafPage *>(buffer_pool_manager_->NewPage(&page_r_id)->GetData());
   page_r->Init(page_r_id, page->GetParentPageId(), leaf_max_size_);
-  int mid = ceil(static_cast<double>(page->GetMaxSize() - 1) / 2);
+  int mid = page->GetMinSize();
   for(int i = mid, j=0; i < page->GetSize(); i++, j++){
     page_r->array_[j] = page->array_[i];
   }
@@ -162,7 +162,7 @@ void BPLUSTREE_TYPE::InternalPageInsert(InternalPage * page, const KeyType &key,
   page_id_t page_r_id;
   InternalPage * page_r = reinterpret_cast<InternalPage *>(buffer_pool_manager_->NewPage(&page_r_id)->GetData());
   page_r->Init(page_r_id, page->GetParentPageId(), leaf_max_size_);
-  int mid = ceil(static_cast<double>(page->GetMaxSize()-1)/2);
+  int mid = page->GetMinSize();
   for(int i = mid, j=0; i < page->GetSize(); i++, j++){
     page_r->array_[j] = page->array_[i];
   }
@@ -278,9 +278,9 @@ void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, cons
       root_page_id_ = m_page->ValueAt(0);
       BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
       root_page->SetParentPageId(INVALID_PAGE_ID);
-      buffer_pool_manager_->UnpinPage(root_page_id_, true);
       UpdateRootPageId(0);
       buffer_pool_manager_->DeletePage(m_page->GetPageId());
+      buffer_pool_manager_->UnpinPage(root_page_id_, true);
     }
     return;
   }
