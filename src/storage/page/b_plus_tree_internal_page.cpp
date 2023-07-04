@@ -29,7 +29,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size)
 {
   SetMaxSize(max_size+1);
-  SetSize(1);
+  SetSize(0);
   SetParentPageId(parent_id);
   SetPageId(page_id);
   SetPageType(IndexPageType::INTERNAL_PAGE);
@@ -68,11 +68,13 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &valu
   array_[index].second=value; 
 }
 
-
+/**
+ * Position where to find the key
+*/
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int { 
   int i;
-  for(i = GetSize() - 1; i > 0 && comparator(key, array_[i].first) == -1; i--)
+  for(i = GetSize()-1; i > 0 && comparator(key, array_[i].first) == -1; i--)
       ;
   return i;
 }
@@ -85,7 +87,9 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const MappingType &pair, const KeyCo
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool{
-  int i = IndexOfKey(key, comparator);
+  int i;
+  for(i = GetSize(); i > 0 && comparator(key, array_[i-1].first) == -1; i--)
+      ;
   InsertAt(key, value, i);
   return true;
 }

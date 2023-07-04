@@ -75,7 +75,7 @@ static constexpr int LOG_LEVEL_ALL = 0;
 static constexpr int LOG_LEVEL = LOG_LEVEL_DEBUG;
 #else
 // #pragma message("LOG_LEVEL_WARN is used instead as DEBUG option is off.")
-static constexpr int LOG_LEVEL = LOG_LEVEL_DEBUG;
+static constexpr int LOG_LEVEL = LOG_LEVEL_WARN;
 #endif
 // #pragma message("Give LOG_LEVEL compile option to overwrite the default
 // level.")

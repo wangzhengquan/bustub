@@ -38,8 +38,8 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTreeInternalPage : public BPlusTreePage {
- template <typename KeyType1, typename ValueType1, typename KeyComparator1> 
- friend class BPlusTree;
+ friend class BPlusTree<KeyType, RID, KeyComparator>;
+ friend class BPlusTree<KeyType, ValueType, KeyComparator>;
  public:
   // must call initialize method after "create" a new node
   void Init(page_id_t page_id, page_id_t parent_id = INVALID_PAGE_ID, int max_size = INTERNAL_PAGE_SIZE);

@@ -98,12 +98,10 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const MappingType &pair, const KeyCompar
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool{
   BUSTUB_ASSERT(size_ < GetMaxSize(), "out of range");  
-  // int i = 0;
+  int i ;
   // for( i = 0; i < size_ && comparator(key, array_[i].first) > 0; i++) ;
-  int i;
-  for(i = GetSize() - 1; i > 0 && comparator(key, array_[i].first) == -1; i--)
-    ;
- 
+  for(i = GetSize(); i > 0 && comparator(key, array_[i-1].first) == -1; i--)
+      ;
   InsertAt(key, value, i);
   return true;
 }

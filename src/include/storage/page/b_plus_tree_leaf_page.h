@@ -40,8 +40,7 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTreeLeafPage : public BPlusTreePage {
- template <typename KeyType1, typename ValueType1, typename KeyComparator1> 
- friend class BPlusTree; 
+ friend class BPlusTree<KeyType, ValueType, KeyComparator>; 
  public:
   // After creating a new leaf page from buffer pool, must call initialize
   // method to set default values

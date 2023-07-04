@@ -42,14 +42,14 @@ class BPlusTree {
 
  public:
   explicit BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
-                     int leaf_max_size = LEAF_PAGE_SIZE-1, int internal_max_size = INTERNAL_PAGE_SIZE-1);
+                     int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE-1);
   ~BPlusTree();
   // Returns true if this B+ tree has no keys and values.
   auto IsEmpty() const -> bool;
 
   // Insert a key-value pair into this B+ tree.
   auto Insert(const KeyType &key, const ValueType &value, Transaction *transaction = nullptr) -> bool;
-
+  
   // Remove a key and its value from this B+ tree.
   void Remove(const KeyType &key, Transaction *transaction = nullptr);
 
@@ -57,7 +57,7 @@ class BPlusTree {
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
   auto Find(const KeyType &key) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
 
-  void RemoveAt(BPlusTreePage * page, int index, const KeyType &key);
+  
   // return the page id of the root node
   auto GetRootPageId() -> page_id_t;
 
@@ -80,7 +80,11 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
-  void InsertInParent(const KeyType &keyl, BPlusTreePage *page_l, const KeyType &key, BPlusTreePage * page_r);
+  void LeafPageInsert(LeafPage * page, const KeyType &key, const ValueType &value) ;
+  void InternalPageInsert(InternalPage * page, const KeyType &key, const page_id_t &value) ;
+  void InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r) ;
+  void LeafPageRemoveAt(LeafPage * m_page, int index, const KeyType &key);
+  void InternalPageRemoveAt(InternalPage * page, int index, const KeyType &key);
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;

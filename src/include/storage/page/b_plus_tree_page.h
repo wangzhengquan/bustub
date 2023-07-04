@@ -44,8 +44,6 @@ enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE };
  * ----------------------------------------------------------------------------
  */
 class BPlusTreePage {
-  INDEX_TEMPLATE_ARGUMENTS
-  friend class BPlusTree;
  public:
   auto IsLeafPage() const -> bool;
   auto IsRootPage() const -> bool;
