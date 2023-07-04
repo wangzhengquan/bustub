@@ -184,16 +184,35 @@ TEST(BPlusTreeTests, DeleteTest3) {
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
 
-  std::vector<int64_t> keys = {5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65};
-  for (auto key : keys) {
+  // std::vector<int64_t> keys = {5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65};
+  // for (auto key : keys) {
+  //   int64_t value = key & 0xFFFFFFFF;
+  //   rid.Set(static_cast<int32_t>(key >> 32), value);
+  //   index_key.SetFromInteger(key);
+  //   tree.Insert(index_key, rid, transaction);
+  // }
+
+  for(int64_t i = 0, key = 0; i < 20; ++i, key+=5){
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
 
-  index_key.SetFromInteger(40);
-  tree.Remove(index_key, transaction);
+  // index_key.SetFromInteger(40);
+  // tree.Remove(index_key, transaction);
+
+  // std::vector<int64_t> remove_keys = {1, 5, 3, 4};
+  // for (auto key : remove_keys) {
+  //   index_key.SetFromInteger(key);
+  //   tree.Remove(index_key, transaction);
+  // }
+  for(int64_t i = 0, key = 0; i < 10; ++i, key+=10){
+    index_key.SetFromInteger(key);
+    tree.Remove(index_key, transaction);
+  }
+
+  tree.Draw(bpm, "test-tree.dot");
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   delete transaction;

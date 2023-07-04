@@ -85,7 +85,7 @@ class BPlusTree {
   void InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r) ;
   void LeafPageRemoveAt(LeafPage * m_page, int index, const KeyType &key);
   void InternalPageRemoveAt(InternalPage * page, int index, const KeyType &key);
-
+  void ChangeParentOfChildrenIn(InternalPage * page);
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
 

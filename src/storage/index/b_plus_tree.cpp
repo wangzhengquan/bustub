@@ -168,12 +168,7 @@ void BPLUSTREE_TYPE::InternalPageInsert(InternalPage * page, const KeyType &key,
   }
   page->SetSize(mid);
   page_r->SetSize(page->GetMaxSize() - mid);
-
-  for (int i = 0; i < page_r->GetSize(); i++) {
-    // Set parent_id of nodes in page_r to page_r_id
-    BPlusTreePage * page_tmp = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_r->ValueAt(i))->GetData());
-    page_tmp->SetParentPageId(page_r_id);
-  }
+  ChangeParentOfChildrenIn(page_r);
 
   if(page->IsRootPage()){
     InsertInNewRoot(page->KeyAt(0), page, page_r->KeyAt(0), page_r);
@@ -281,6 +276,9 @@ void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, cons
   if(m_page->IsRootPage()){
     if(m_page->GetSize()==1){
       root_page_id_ = m_page->ValueAt(0);
+      BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
+      root_page->SetParentPageId(INVALID_PAGE_ID);
+      buffer_pool_manager_->UnpinPage(root_page_id_, true);
       UpdateRootPageId(0);
       buffer_pool_manager_->DeletePage(m_page->GetPageId());
     }
@@ -318,15 +316,29 @@ void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, cons
     // Coalesce
     if(l_page != nullptr){
       l_page->Coalesce(m_page, comparator_);
+      ChangeParentOfChildrenIn(l_page);
       buffer_pool_manager_->DeletePage(m_page->GetPageId());
       InternalPageRemoveAt(parent_page, indexOfPage, key);
     } else if(r_page != nullptr){
       m_page->Coalesce(r_page, comparator_);
+      ChangeParentOfChildrenIn(m_page);
       buffer_pool_manager_->DeletePage(r_page->GetPageId());
       InternalPageRemoveAt(parent_page, indexOfPage+1, key);
     }
   }
 }
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::ChangeParentOfChildrenIn(InternalPage * page){
+  page_id_t page_id = page->GetPageId();
+  for (int i = 0; i < page->GetSize(); i++) {
+    BPlusTreePage * page_tmp = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page->ValueAt(i))->GetData());
+    page_tmp->SetParentPageId(page_id);
+    buffer_pool_manager_->UnpinPage(page_tmp->GetPageId(), true);
+  }
+}
+
+
 
 /*****************************************************************************
  * INDEX ITERATOR
