@@ -109,11 +109,11 @@ class BPlusTree {
 
   // member variable
   std::string index_name_;
-  page_id_t root_page_id_;
   BufferPoolManager *buffer_pool_manager_;
   KeyComparator comparator_;
   int leaf_max_size_;
   int internal_max_size_;
+  page_id_t root_page_id_ = INVALID_PAGE_ID;
 
   // BPlusTreePage* root_page_ = nullptr;
 };
