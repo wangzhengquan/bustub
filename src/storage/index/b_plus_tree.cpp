@@ -63,22 +63,38 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
   
 }
 
-
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Find(const KeyType &key) -> LeafPage* {
+auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op ) -> LeafPage* {
   if(root_page_id_ == INVALID_PAGE_ID) 
     return nullptr;
 
-  BPlusTreePage *cur_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
+  int cmp = 1;
+  BPlusTreePage * root_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(root_page_id_)->GetData());
+  BPlusTreePage * cur_page = root_page;
   while(!cur_page->IsLeafPage()){
     InternalPage * cur_inter_page = static_cast<InternalPage* >(cur_page);
     int i = cur_inter_page->IndexOfKey(key, comparator_);
    // BUSTUB_ASSERT(i >=0 , "Find error invalide index = %d\n ", i); 
     if(i == -1) return nullptr;
+    if(cur_page == root_page && i == 0) {
+      cmp = comparator_(key, cur_inter_page->KeyAt(0));
+       
+    }
+    
+    if(op == Operation::INSERT && cmp == -1){
+      // int insert operation, if the inserting key was the minmum one of all the keys in the tree,
+      // then all parents's left branch key should set to be this key
+      cur_inter_page->SetKeyAt(0, key);
+    } else if(op == Operation::REMOVE && cmp == 0){
+      // int the remove operation, if the minmum one in the tree was removed,
+      // then all parents's left branch key should set to be the next slibing key of this key.
+      // but finding the slibing of this key spend some performance overhead, 
+      // and there is no impact on correctness if I don't do anything
+    }
+    
 
     page_id_t page_id = cur_inter_page->ValueAt(i);
     buffer_pool_manager_->UnpinPage(cur_page->GetPageId(), false);
-   
     cur_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id)->GetData());
   }
 
@@ -111,18 +127,17 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
     buffer_pool_manager_->UnpinPage(root_page_id_, true);
   }
 
-  LeafPage *page = Find(key);
-// std::cout << ">>>>>>>>>> page_le = "<< page_l << std::endl;
+  LeafPage *page = Find(key, Operation::INSERT);
   if(page->IndexOfKey(key, comparator_) != -1){
     buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
     return false;
   }
-  LeafPageInsert(page, key, value);
+  InsertInLeafPage(page, key, value);
   return true;
  
 }
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::LeafPageInsert(LeafPage * page, const KeyType &key, const ValueType &value) {
+void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage * page, const KeyType &key, const ValueType &value) {
   page->Insert(key, value, comparator_);
   if(page->GetSize() < page->GetMaxSize()){
     buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
@@ -146,13 +161,13 @@ void BPLUSTREE_TYPE::LeafPageInsert(LeafPage * page, const KeyType &key, const V
     InsertInNewRoot(page->KeyAt(0), page, page_r->KeyAt(0), page_r);
   } else {
     InternalPage * parent_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(page_r->GetParentPageId() )->GetData());
-    InternalPageInsert(parent_page, page_r->KeyAt(0), page_r_id);
+    InsertInInternalPage(parent_page, page_r->KeyAt(0), page_r_id);
   }
 }
 
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InternalPageInsert(InternalPage * page, const KeyType &key, const page_id_t &value)  {
+void BPLUSTREE_TYPE::InsertInInternalPage(InternalPage * page, const KeyType &key, const page_id_t &value)  {
   page->Insert(key, value, comparator_);
   if(page->GetSize() < page->GetMaxSize()){
     buffer_pool_manager_->UnpinPage(page->GetPageId(), true);
@@ -174,7 +189,7 @@ void BPLUSTREE_TYPE::InternalPageInsert(InternalPage * page, const KeyType &key,
     InsertInNewRoot(page->KeyAt(0), page, page_r->KeyAt(0), page_r);
   } else {
     InternalPage * parent_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(page_r->GetParentPageId() )->GetData());
-    InternalPageInsert(parent_page, page_r->KeyAt(0), page_r->GetPageId());
+    InsertInInternalPage(parent_page, page_r->KeyAt(0), page_r->GetPageId());
   }
 }
 
@@ -211,13 +226,13 @@ void BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) {
     buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
     return;
   }  
-  LeafPageRemoveAt(leaf_page, i, key);
+  RemoveAtInLeafPage(leaf_page, i, key);
   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
   return ;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::LeafPageRemoveAt(LeafPage * m_page, int index, const KeyType &key){
+void BPLUSTREE_TYPE::RemoveAtInLeafPage(LeafPage * m_page, int index, const KeyType &key){
   LeafPage * l_page=nullptr, * r_page=nullptr;
   m_page->RemoveAt(index); 
   if(m_page->IsRootPage()){
@@ -227,8 +242,7 @@ void BPLUSTREE_TYPE::LeafPageRemoveAt(LeafPage * m_page, int index, const KeyTyp
   int indexOfPage = parent_page->IndexOfKey(key, comparator_);
   int min = m_page->GetMinSize(); 
 
-  // if the original minest key was the one which is removed
-  parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
+ 
   if(m_page->GetSize() >= min){
     return;
   }
@@ -251,6 +265,8 @@ void BPLUSTREE_TYPE::LeafPageRemoveAt(LeafPage * m_page, int index, const KeyTyp
     // borrow from right
     m_page->Insert(r_page->At(0), comparator_);
     r_page->RemoveAt(0);
+    // if the original minest key was the one which is removed
+    parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
     parent_page->SetKeyAt(indexOfPage+1, r_page->KeyAt(0));
 
   } else {
@@ -259,18 +275,20 @@ void BPLUSTREE_TYPE::LeafPageRemoveAt(LeafPage * m_page, int index, const KeyTyp
       l_page->Coalesce(m_page, comparator_);
       l_page->SetNextPageId(m_page->GetNextPageId());
       buffer_pool_manager_->DeletePage(m_page->GetPageId());
-      InternalPageRemoveAt(parent_page, indexOfPage, key);
+      RemoveAtInInternalPage(parent_page, indexOfPage, key);
     } else if(r_page != nullptr){
       m_page->Coalesce(r_page, comparator_);
       m_page->SetNextPageId(r_page->GetNextPageId());
+      // if the original minest key was the one which is removed
+      parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
       buffer_pool_manager_->DeletePage(r_page->GetPageId());
-      InternalPageRemoveAt(parent_page, indexOfPage+1, key);
+      RemoveAtInInternalPage(parent_page, indexOfPage+1, key);
     }
   }
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, const KeyType &key){
+void BPLUSTREE_TYPE::RemoveAtInInternalPage(InternalPage * m_page, int index, const KeyType &key){
   InternalPage * l_page=nullptr, * r_page=nullptr;
   m_page->RemoveAt(index);
   if(m_page->IsRootPage()){
@@ -289,8 +307,6 @@ void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, cons
   int indexOfPage = parent_page->IndexOfKey(key, comparator_);
   int min = m_page->GetMinSize(); ;
   
-  // if the original minest key was the one which is removed
-  parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
   if(m_page->GetSize() >= min){
     return;
   }
@@ -311,6 +327,8 @@ void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, cons
     // borrow from right
     m_page->Insert(r_page->At(0), comparator_);
     r_page->RemoveAt(0);
+    // if the original minest key was the one which is removed
+    parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
     parent_page->SetKeyAt(indexOfPage+1, r_page->KeyAt(0));
   } else {
     // Coalesce
@@ -318,12 +336,14 @@ void BPLUSTREE_TYPE::InternalPageRemoveAt(InternalPage * m_page, int index, cons
       l_page->Coalesce(m_page, comparator_);
       ChangeParentOfChildrenIn(l_page);
       buffer_pool_manager_->DeletePage(m_page->GetPageId());
-      InternalPageRemoveAt(parent_page, indexOfPage, key);
+      RemoveAtInInternalPage(parent_page, indexOfPage, key);
     } else if(r_page != nullptr){
       m_page->Coalesce(r_page, comparator_);
+      // if the original minest key was the one which is removed
+      parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
       ChangeParentOfChildrenIn(m_page);
       buffer_pool_manager_->DeletePage(r_page->GetPageId());
-      InternalPageRemoveAt(parent_page, indexOfPage+1, key);
+      RemoveAtInInternalPage(parent_page, indexOfPage+1, key);
     }
   }
 }

@@ -51,8 +51,11 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   inline auto At(int index) -> MappingType&;
   inline auto At(int index) const -> const MappingType&;
   auto IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int;
-  auto Insert(const MappingType &pair, const KeyComparator &comparator) -> bool;
-  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> bool;
+  /**
+   * @return the position where it's inserted
+  */
+  auto Insert(const MappingType &pair, const KeyComparator &comparator) -> int;
+  auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> int;
   void InsertAt(const KeyType &key, const ValueType &value, int i);
   void Append(const KeyType &key, const ValueType &value);
   void Coalesce(BPlusTreeInternalPage *other, const KeyComparator &comparator);

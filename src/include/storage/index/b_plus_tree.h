@@ -39,7 +39,8 @@ class BPlusTree {
   
   using InternalPage = BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
-
+ private:
+  enum class Operation { FIND = 0, INSERT, REMOVE };
  public:
   explicit BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
                      int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE-1);
@@ -55,8 +56,6 @@ class BPlusTree {
 
   // return the value associated with a given key
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
-  auto Find(const KeyType &key) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
-
   
   // return the page id of the root node
   auto GetRootPageId() -> page_id_t;
@@ -80,12 +79,29 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
-  void LeafPageInsert(LeafPage * page, const KeyType &key, const ValueType &value) ;
-  void InternalPageInsert(InternalPage * page, const KeyType &key, const page_id_t &value) ;
+  /**
+   * @insert find for insert
+  */
+  auto Find(const KeyType &key, Operation op = Operation::FIND) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
+  /**
+   * Insert  {key, value} into LeafPage
+  */
+  void InsertInLeafPage(LeafPage * page, const KeyType &key, const ValueType &value) ;
+  /**
+   * Insert  {key, value} into InternalPage
+  */
+  void InsertInInternalPage(InternalPage * page, const KeyType &key, const page_id_t &value) ;
   void InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r) ;
-  void LeafPageRemoveAt(LeafPage * m_page, int index, const KeyType &key);
-  void InternalPageRemoveAt(InternalPage * page, int index, const KeyType &key);
+  /**
+   * Remove the node at index in LeafPage
+  */
+  void RemoveAtInLeafPage(LeafPage * page, int index, const KeyType &key);
+  void RemoveAtInInternalPage(InternalPage * page, int index, const KeyType &key);
+  /**
+   * Change the parent id of all child nodes under this node to this node's id.
+   * */
   void ChangeParentOfChildrenIn(InternalPage * page);
+
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
 
