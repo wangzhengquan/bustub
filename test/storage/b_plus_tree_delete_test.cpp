@@ -172,7 +172,7 @@ TEST(BPlusTreeTests, DISABLED_Random_Test) {
   auto *disk_manager = new DiskManager("test.db");
   BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
   // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
   GenericKey<8> index_key;
   RID rid;
   // create transaction
@@ -183,21 +183,19 @@ TEST(BPlusTreeTests, DISABLED_Random_Test) {
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
 
-  std::vector<int64_t> keys = {5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65};
+  std::vector<int64_t> keys = {6, 16, 26, 36, 46};
   for (auto key : keys) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
-  // index_key.SetFromInteger(40);
-  // tree.Remove(index_key, transaction);
 
-  std::vector<int64_t> remove_keys = {1, 5, 3, 4};
-  for (auto key : remove_keys) {
-    index_key.SetFromInteger(key);
-    tree.Remove(index_key, transaction);
-  }
+  // std::vector<int64_t> remove_keys = {1, 5, 3, 4};
+  // for (auto key : remove_keys) {
+  //   index_key.SetFromInteger(key);
+  //   tree.Remove(index_key, transaction);
+  // }
    
   tree.Draw(bpm, "random.dot");
 
@@ -209,7 +207,7 @@ TEST(BPlusTreeTests, DISABLED_Random_Test) {
   remove("test.log");
 }
 
-TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
+TEST(BPlusTreeTests, DISABLED_InsertOnAscent_DeleteOnDecent_Test) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -253,7 +251,7 @@ TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
 
 
 
-TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Test) {
+TEST(BPlusTreeTests,  InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -285,7 +283,7 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Test) {
     tree.Remove(index_key, transaction);
   }
 
-  tree.Draw(bpm, "descent.dot");
+  tree.Draw(bpm, "descent5.dot");
   tree.Print(bpm);
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);

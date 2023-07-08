@@ -80,17 +80,17 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op ) -> LeafPage* {
     }
     
     if(op == Operation::INSERT && cmp == -1){
-      // int insert operation, if the inserting key was the minmum one of all the keys in the tree,
-      // then all parents's left branch key should set to be this key
-      cur_inter_page->SetKeyAt(0, key);
-    } else if(op == Operation::REMOVE && cmp == 0){
-      // int the remove operation, if the minmum one in the tree was removed,
-      // then all parents's left branch key should set to be the next slibing key of this key.
-      // but finding the slibing of this key spend some performance overhead, 
-      // and there is no impact on correctness if I don't do anything
-    }
-    
+      /**
+       *  Int insert operation, if the inserting key was the minmum one of all the keys in the tree,
+       *  then all parents's left branch key should set to be this key
+      */
 
+      // cur_inter_page->SetKeyAt(0, key);
+
+      /**
+       * Above problem has been fixed in the 'B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert' method perfectly.
+       */ 
+    }
     page_id_t page_id = cur_inter_page->ValueAt(i);
     buffer_pool_manager_->UnpinPage(cur_page->GetPageId(), false);
     cur_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager_->FetchPage(page_id)->GetData());
@@ -242,6 +242,7 @@ void BPLUSTREE_TYPE::RemoveAtInLeafPage(LeafPage * m_page, int index, const KeyT
 
  
   if(m_page->GetSize() >= min){
+    parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
     return;
   }
 
@@ -306,6 +307,7 @@ void BPLUSTREE_TYPE::RemoveAtInInternalPage(InternalPage * m_page, int index, co
   int min = m_page->GetMinSize(); ;
   
   if(m_page->GetSize() >= min){
+    parent_page->SetKeyAt(indexOfPage, m_page->KeyAt(0));
     return;
   }
   if(indexOfPage+1 < parent_page->GetSize()){
