@@ -73,6 +73,8 @@ class BPlusTreePage {
   int max_size_ ;
   page_id_t parent_page_id_ ;
   page_id_t page_id_ ;
+  mutable std::shared_mutex mutex_;
+  // ReaderWriterLatch latch_;
 };
 
 }  // namespace bustub

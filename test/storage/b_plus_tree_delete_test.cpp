@@ -283,6 +283,13 @@ TEST(BPlusTreeTests,  InsertOnDescent_DeleteOnAscent_Degree5_Test) {
     tree.Remove(index_key, transaction);
   }
 
+  for(int64_t key = 1; key < 20; ++key){
+    int64_t value = key & 0xFFFFFFFF;
+    rid.Set(static_cast<int32_t>(key >> 32), value);
+    index_key.SetFromInteger(key);
+    tree.Insert(index_key, rid, transaction);
+  }
+
   tree.Draw(bpm, "descent5.dot");
   tree.Print(bpm);
 

@@ -75,7 +75,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &valu
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int { 
   int i;
-  // Note that the compare operation will stop when 'i=1', that is because the key at position 0 in an internal node is a virtual key that conceptually represents the minimum key.
+  // Note that the compare operation will stop when 'i=1', that is because the key at position 0 in an internal node is a virtual key that conceptually represents the minimum key of the node.
   for(i = GetSize()-1; i > 0 && comparator(key, array_[i].first) == -1; i--)
       ;
   return i;
@@ -91,7 +91,7 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> int{
   int i;
   /**
-   * Here, the stop condition is 'i > 1' instead of 'i > 0' because the key at position 0 in an internal node is a virtual key that conceptually represents the minimum key. 
+   * Here, the stop condition is 'i > 1' instead of 'i > 0' because the key at position 0 in an internal node is a virtual key that conceptually represents the minimum key of the node. 
    * However, it may not necessarily have the minimum or even an actual value associated with it.
    * To treat the virtual key as the minimum one, when iterating over the keys in the node, we start from maximum position and continue until 'i > 1'.
    * Therefore, unless the 'array_' is empty, the insert index 'i' will always be greater than 0.
