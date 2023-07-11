@@ -13,6 +13,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <list>
 #include <memory>
 
 #include "concurrency/transaction.h"
@@ -79,10 +80,11 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
+  void UnlockPageList( std::list<BPlusTreePage *> * locked_list, bool dirty);
   /**
    * @insert find for insert
   */
-  auto Find(const KeyType &key, Operation op = Operation::FIND) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
+  auto Find(const KeyType &key, Operation op = Operation::FIND, std::list<BPlusTreePage *> *locked_list=nullptr) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
   /**
    * Insert  {key, value} into LeafPage
   */
@@ -114,7 +116,7 @@ class BPlusTree {
   int leaf_max_size_;
   int internal_max_size_;
   page_id_t root_page_id_ = INVALID_PAGE_ID;
-
+  mutable std::mutex mutex_;
   // BPlusTreePage* root_page_ = nullptr;
 };
 
