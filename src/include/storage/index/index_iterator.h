@@ -28,31 +28,28 @@ class IndexIterator {
   // using pointer           = MappingType*;
   // using reference         = MappingType&;
   // you may define your own constructor based on your member variables
-  IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE * leaf_page, BufferPoolManager * bpm, int index = 0);
+  IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page, BufferPoolManager *bpm, int index = 0);
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
 
   auto operator*() -> const MappingType &;
-  auto operator->() -> const MappingType* ;
+  auto operator->() -> const MappingType *;
   // Prefix increment
   auto operator++() -> IndexIterator &;
-   // Postfix increment
+  // Postfix increment
   auto operator++(int) -> IndexIterator;
 
-  auto operator==(const IndexIterator &itr) const -> bool { 
-    return leaf_page_->GetPageId() == itr.leaf_page_->GetPageId() && 
-           index_ == itr.index_;
+  auto operator==(const IndexIterator &itr) const -> bool {
+    return leaf_page_->GetPageId() == itr.leaf_page_->GetPageId() && index_ == itr.index_;
   }
 
-  auto operator!=(const IndexIterator &itr) const -> bool { 
-    return !(itr == *this);
-  }
+  auto operator!=(const IndexIterator &itr) const -> bool { return !(itr == *this); }
 
  private:
   // add your own private member variables here
-  B_PLUS_TREE_LEAF_PAGE_TYPE * leaf_page_;
-  BufferPoolManager * bpm_;
+  B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page_;
+  BufferPoolManager *bpm_;
   int index_;
 };
 

@@ -18,16 +18,16 @@
 
 namespace bustub {
 
-// #define BUSTUB_ASSERT(expr, message) assert((expr) && (message)) 
+// #define BUSTUB_ASSERT(expr, message) assert((expr) && (message))
 
-#define BUSTUB_ASSERT(expr, ...)        \
-    if (!(expr)) { \
-      LOG_ERROR("assertion failed: %s \n", #expr); \
-      ::fprintf(stdout, __VA_ARGS__);  \
-      fflush(stdout); \
-      while(true); \
-   }  
-
+#define BUSTUB_ASSERT(expr, ...)                 \
+  if (!(expr)) {                                 \
+    LOG_ERROR("assertion failed: %s \n", #expr); \
+    ::fprintf(stdout, __VA_ARGS__);              \
+    fflush(stdout);                              \
+    while (true)                                 \
+      ;                                          \
+  }
 
 #define UNIMPLEMENTED(message) throw std::logic_error(message)
 

@@ -24,9 +24,8 @@ namespace bustub {
 
 #define INDEX_TEMPLATE_ARGUMENTS template <typename KeyType, typename ValueType, typename KeyComparator>
 
-
 INDEX_TEMPLATE_ARGUMENTS
-class BPlusTree ;
+class BPlusTree;
 // define page type enum
 enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE };
 
@@ -45,7 +44,8 @@ enum class IndexPageType { INVALID_INDEX_PAGE = 0, LEAF_PAGE, INTERNAL_PAGE };
  */
 class BPlusTreePage {
   INDEX_TEMPLATE_ARGUMENTS
-  friend class BPlusTree; 
+  friend class BPlusTree;
+
  public:
   auto IsLeafPage() const -> bool;
   auto IsRootPage() const -> bool;
@@ -69,12 +69,12 @@ class BPlusTreePage {
 
  protected:
   // member variable, attributes that both internal and leaf page share
-  IndexPageType page_type_ ;
-  lsn_t lsn_ ;
-  int size_ ;
-  int max_size_ ;
-  page_id_t parent_page_id_ ;
-  page_id_t page_id_ ;
+  IndexPageType page_type_;
+  lsn_t lsn_;
+  int size_;
+  int max_size_;
+  page_id_t parent_page_id_;
+  page_id_t page_id_;
   // mutable std::shared_mutex mutex_;
   ReaderWriterLatch latch_;
 };

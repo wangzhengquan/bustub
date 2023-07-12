@@ -3,7 +3,8 @@ add_library(
   OBJECT
   bustub_instance.cpp
   config.cpp
-  util/string_util.cpp)
+  util/string_util.cpp
+  util/task_util.cpp)
 
 set(ALL_OBJECT_FILES
     ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:bustub_common>

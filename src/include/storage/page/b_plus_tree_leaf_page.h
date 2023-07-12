@@ -40,7 +40,8 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTreeLeafPage : public BPlusTreePage {
- friend class BPlusTree<KeyType, ValueType, KeyComparator>; 
+  friend class BPlusTree<KeyType, ValueType, KeyComparator>;
+
  public:
   // After creating a new leaf page from buffer pool, must call initialize
   // method to set default values
@@ -50,37 +51,36 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   auto ValueAt(int index) const -> ValueType;
-  inline auto At(int index) -> MappingType&;
-  inline auto At(int index) const -> const MappingType&;
+  inline auto At(int index) -> MappingType &;
+  inline auto At(int index) const -> const MappingType &;
   void SetAt(int index, const KeyType &key, const ValueType &value);
   // auto Find(const KeyType &key, ValueType &value, const KeyComparator &comparator) const -> bool;
-  auto IndexOfKey(const KeyType &key,  const KeyComparator &comparator) const -> int;
+  auto IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int;
   /**
    * @return the position where it's inserted
-  */
+   */
   auto Insert(const MappingType &pair, const KeyComparator &comparator) -> int;
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> int;
-  void InsertAt(const KeyType &key, const ValueType &value, int i) ;
+  void InsertAt(const KeyType &key, const ValueType &value, int i);
   void Append(const KeyType &key, const ValueType &value);
-  void Coalesce(BPlusTreeLeafPage * other, const KeyComparator &comparator);
-  void RemoveAt(int i) ;
+  void Coalesce(BPlusTreeLeafPage *other, const KeyComparator &comparator);
+  void RemoveAt(int i);
+
  private:
   page_id_t next_page_id_;
   // Flexible array member for page data.
   MappingType array_[1];
 };
 
-
-
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index)  -> MappingType& {
-  BUSTUB_ASSERT(index < GetSize(), "invalid index ");
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) -> MappingType & {
+  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index ");
   return array_[index];
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) const -> const MappingType& {
-  BUSTUB_ASSERT(index < GetSize(), "invalid index ");
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) const -> const MappingType & {
+  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index ");
   return array_[index];
 }
 

@@ -10,11 +10,11 @@
 //===----------------------------------------------------------------------===//
 #pragma once
 
+#include <list>
+#include <memory>
 #include <queue>
 #include <string>
 #include <vector>
-#include <list>
-#include <memory>
 
 #include "concurrency/transaction.h"
 #include "storage/index/index_iterator.h"
@@ -37,27 +37,28 @@ namespace bustub {
  */
 INDEX_TEMPLATE_ARGUMENTS
 class BPlusTree {
-  
   using InternalPage = BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
   using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+
  private:
   enum class Operation { FIND = 0, INSERT, REMOVE };
+
  public:
   explicit BPlusTree(std::string name, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
-                     int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE-1);
+                     int leaf_max_size = LEAF_PAGE_SIZE, int internal_max_size = INTERNAL_PAGE_SIZE - 1);
   ~BPlusTree();
   // Returns true if this B+ tree has no keys and values.
   auto IsEmpty() const -> bool;
 
   // Insert a key-value pair into this B+ tree.
   auto Insert(const KeyType &key, const ValueType &value, Transaction *transaction = nullptr) -> bool;
-  
+
   // Remove a key and its value from this B+ tree.
   void Remove(const KeyType &key, Transaction *transaction = nullptr);
 
   // return the value associated with a given key
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
-  
+
   // return the page id of the root node
   auto GetRootPageId() -> page_id_t;
 
@@ -80,29 +81,30 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
-  void UnlockPageList( std::list<BPlusTreePage *> * locked_list, bool dirty);
+  void UnlockPageList(std::list<BPlusTreePage *> *locked_list, bool dirty);
   /**
    * @insert find for insert
-  */
-  auto Find(const KeyType &key, Operation op = Operation::FIND, std::list<BPlusTreePage *> *locked_list=nullptr) -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>*;
+   */
+  auto Find(const KeyType &key, Operation op = Operation::FIND, std::list<BPlusTreePage *> *locked_list = nullptr)
+      -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *;
   /**
    * Insert  {key, value} into LeafPage
-  */
-  void InsertInLeafPage(LeafPage * page, const KeyType &key, const ValueType &value) ;
+   */
+  void InsertInLeafPage(LeafPage *page, const KeyType &key, const ValueType &value);
   /**
    * Insert  {key, value} into InternalPage
-  */
-  void InsertInInternalPage(InternalPage * page, const KeyType &key, const page_id_t &value) ;
-  void InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r) ;
+   */
+  void InsertInInternalPage(InternalPage *page, const KeyType &key, const page_id_t &value);
+  void InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r);
   /**
    * Remove the node at index in LeafPage
-  */
-  void RemoveAtInLeafPage(LeafPage * page, int index, const KeyType &key);
-  void RemoveAtInInternalPage(InternalPage * page, int index, const KeyType &key);
+   */
+  void RemoveAtInLeafPage(LeafPage *page, int index, const KeyType &key);
+  void RemoveAtInInternalPage(InternalPage *page, int index, const KeyType &key);
   /**
    * Change the parent id of all child nodes under this node to this node's id.
    * */
-  void ChangeParentOfChildrenIn(InternalPage * page);
+  void ChangeParentOfChildrenIn(InternalPage *page);
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;

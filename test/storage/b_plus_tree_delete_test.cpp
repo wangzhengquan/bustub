@@ -196,7 +196,7 @@ TEST(BPlusTreeTests, DISABLED_Random_Test) {
   //   index_key.SetFromInteger(key);
   //   tree.Remove(index_key, transaction);
   // }
-   
+
   tree.Draw(bpm, "random.dot");
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
@@ -226,15 +226,14 @@ TEST(BPlusTreeTests, DISABLED_InsertOnAscent_DeleteOnDecent_Test) {
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
 
-   
-  for(int64_t key = 1; key < 40;  ++key){
+  for (int64_t key = 1; key < 40; ++key) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
- 
-  for(int64_t key = 20; key > 0 ; --key){
+
+  for (int64_t key = 20; key > 0; --key) {
     index_key.SetFromInteger(key);
     tree.Remove(index_key, transaction);
   }
@@ -249,9 +248,7 @@ TEST(BPlusTreeTests, DISABLED_InsertOnAscent_DeleteOnDecent_Test) {
   remove("test.log");
 }
 
-
-
-TEST(BPlusTreeTests,  InsertOnDescent_DeleteOnAscent_Degree5_Test) {
+TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -269,21 +266,20 @@ TEST(BPlusTreeTests,  InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   page_id_t page_id;
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
- 
 
-  for(int64_t key = 40; key > 0; key--){
+  for (int64_t key = 40; key > 0; key--) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
- 
-  for(int64_t key = 1; key < 20; ++key){
+
+  for (int64_t key = 1; key < 20; ++key) {
     index_key.SetFromInteger(key);
     tree.Remove(index_key, transaction);
   }
 
-  for(int64_t key = 1; key < 20; ++key){
+  for (int64_t key = 1; key < 20; ++key) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
@@ -300,7 +296,6 @@ TEST(BPlusTreeTests,  InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   remove("test.db");
   remove("test.log");
 }
-
 
 TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree3_Test) {
   // create KeyComparator and index schema
@@ -320,16 +315,15 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree3_Test) {
   page_id_t page_id;
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
- 
 
-  for(int64_t key = 22; key > 0; key--){
+  for (int64_t key = 22; key > 0; key--) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
- 
-  for(int64_t key = 1; key < 10; ++key){
+
+  for (int64_t key = 1; key < 10; ++key) {
     index_key.SetFromInteger(key);
     tree.Remove(index_key, transaction);
   }

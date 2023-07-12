@@ -52,6 +52,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   } else {
     free_list_lock.unlock();
     if (!replacer_->Evict(&frame_id)) {
+      BUSTUB_ASSERT(false, "NewPgImp nullptr \n ");
       return nullptr;
     }
   }
@@ -74,8 +75,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   replacer_->SetEvictable(frame_id, false);
   page_table_->Insert(new_page_id, frame_id);
 
-  if(page_id!=nullptr)
-    *page_id = new_page_id;
+  if (page_id != nullptr) *page_id = new_page_id;
   return &page;
 }
 
