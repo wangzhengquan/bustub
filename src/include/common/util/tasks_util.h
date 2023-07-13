@@ -15,6 +15,7 @@
 
 typedef int TaskID;
 
+
 // class IRunnable {
 //  public:
 //   virtual ~IRunnable();
@@ -31,33 +32,38 @@ typedef int TaskID;
 //   virtual void runTask(int task_id, int num_total_tasks) = 0;
 // };
 
-class TaskUtil {
+class TasksUtil {
+  //< from, to>
+  using WorkFunction =  std::function<void(size_t, size_t)>;
  private:
   enum class State { Ready = 0, Running, Terminated };
   class ReadyTask {
    public:
     TaskID task_id_;
-    //< worker_id, int num_task_workers>
-    std::function<void(int, int)> &runnable;
+    
+    WorkFunction work_;
      
-    int worker_id_{0};
-    int num_task_workers_{0};
+    size_t worker_id_{0};
+    size_t num_workers_{0};
     std::mutex mutex;
     std::condition_variable cv;
-    int num_workers_completed{0};
+    size_t num_workers_completed{0};
 
-    ReadyTask(int task_id, std::function<void(int, int)> &_runnable, int num_task_workers)
-        : task_id_(task_id), runnable(_runnable), num_task_workers_(num_task_workers) {}
+    size_t total_amount_works_;
+
+    ReadyTask(int task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works)
+        : task_id_(task_id), work_(work), num_workers_(num_workers), total_amount_works_(total_amount_works) {}
   };
 
   class WaitTask {
    public:
     TaskID task_id_;
-    std::function<void(int, int)> &runnable;
-    int num_task_workers_;
+    WorkFunction work_;
+    size_t num_workers_;
     std::list<TaskID> deps{};
-    WaitTask(TaskID task_id, std::function<void(int, int)> &_runnable, int num_task_workers, const std::vector<TaskID> &_deps)
-        : task_id_(task_id), runnable(_runnable), num_task_workers_(num_task_workers) {
+    size_t total_amount_works_;
+    WaitTask(TaskID task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &_deps)
+        : task_id_(task_id), work_(work), num_workers_(num_workers), total_amount_works_(total_amount_works) {
       for (TaskID dep : _deps) {
         deps.push_back(dep);
       }
@@ -92,12 +98,10 @@ class TaskUtil {
   };
 
   std::vector<std::thread> _threads_pool;
-  std::deque<std::function<void(int, int)> > fun_queue_;
   int next_task_id_{0};
   ReadyQueue ready_queue;
   WaitQueue wait_queue;
   CompleteQueue complete_queue;
-  int my_stopi = 0;
   int num_threads_;
   
 
@@ -108,9 +112,8 @@ class TaskUtil {
       - num_threads: the maximum number of threads that the task system
         can use.
     */
-  TaskUtil(int num_threads);
-  ~TaskUtil();
-  const char *name();
+  TasksUtil(int num_threads);
+  ~TasksUtil();
 
   void run();
   /*
@@ -119,7 +122,7 @@ class TaskUtil {
     will return only when the execution of all tasks is
     complete.
   */
-  void addTask(std::function<void(int, int)> runnable, int num_task_workers);
+  void addTask(WorkFunction work, size_t num_workers, size_t total_amount_works);
 
   /*
     Executes an asynchronous bulk task launch of
@@ -139,7 +142,7 @@ class TaskUtil {
     runAsnycWithDeps() to specify a dependency of some future
     bulk task launch on this bulk task launch.
     */
-  void addTaskWithDeps(std::function<void(int, int)> runnable, int num_task_workers, const std::vector<TaskID> &deps);
+  void addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &deps);
 
   /*
     Blocks until all tasks created as a result of **any prior**

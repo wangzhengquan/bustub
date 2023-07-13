@@ -157,7 +157,7 @@ void ExtendibleHashTable<K, V>::Show() {
 //===--------------------------------------------------------------------===//
 template <typename K, typename V>
 ExtendibleHashTable<K, V>::Bucket::Bucket(size_t capcity, int depth) : capcity_(capcity), depth_(depth) {
-  std::cout << "Bucket construct" << std::endl;
+  // std::cout << "Bucket construct" << std::endl;
 }
 
 template <typename K, typename V>

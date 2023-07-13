@@ -108,6 +108,9 @@ class ExtendibleHashTable : public HashTable<K, V> {
    */
   auto Remove(const K &key) -> bool override;
 
+  auto GetSize() -> size_t {
+    return size_;
+  }
   void Show();
 
 
@@ -183,7 +186,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
   int num_buckets_;     // The number of buckets in the hash table
   mutable std::shared_mutex mutex_;
   std::vector<std::shared_ptr<Bucket>> dir_;  // The directory of the hash table
-  size_t size_;
+  size_t size_ = 0;
   // The following functions are completely optional, you can delete them if you have your own ideas.
 
   /**
