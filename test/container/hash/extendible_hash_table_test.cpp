@@ -79,12 +79,17 @@ TEST(ExtendibleHashTableTest, MyTest1) {
   EXPECT_EQ(10, result);
 }
 
-class InsertTask : public IRunnable {
+class InsertTask  {
+private:
+  // std::shared_mutex mutex_;
+  ExtendibleHashTable<int, int> *table_;
+  std::vector<int> &keys_;
 public:
-    ExtendibleHashTable<int, int> *table_;
-    const std::vector<int> &keys_;
+    
+    // InsertTask(InsertTask & other): table_(other.table_), keys_(other.keys_){
+    // }
 
-    InsertTask(ExtendibleHashTable<int, int> *table, const std::vector<int> &keys)
+    InsertTask(ExtendibleHashTable<int, int> *table,  std::vector<int> &keys)
         : table_(table), keys_(keys) {}
     ~InsertTask() {}
 
@@ -96,7 +101,41 @@ public:
         return accumulator;
     }
 
-    void runTask(int task_id, int num_total_tasks) {
+    void operator()(int task_id, int num_total_tasks) {
+      size_t num_elements = keys_.size();
+      size_t elements_per_task = (num_elements + num_total_tasks - 1) / num_total_tasks;
+      size_t start = elements_per_task * task_id;
+      size_t end = std::min(start + elements_per_task, num_elements);
+      for (size_t i = start; i < end; i++) {
+        int key = keys_[i];
+        // std::unique_lock<std::shared_mutex> lock(mutex_);
+        std::cout << "insert " << key << std::endl;
+        // lock.unlock();
+        table_->Insert(key, key);
+      }
+    }
+};
+
+class DeleteTask  {
+  // std::shared_mutex mutex_;
+  ExtendibleHashTable<int, int> *table_;
+  std::vector<int> &keys_;
+public:
+    // DeleteTask(DeleteTask & other): table_(other.table_), keys_(other.keys_){
+    // }
+    DeleteTask(ExtendibleHashTable<int, int> *table, std::vector<int> &keys)
+        : table_(table), keys_(keys) {}
+    ~DeleteTask() {}
+
+    static inline int multiply_task(int iters, int input) {
+        int accumulator = 1;
+        for (int i = 0; i < iters; ++i) {
+            accumulator *= input;
+        }
+        return accumulator;
+    }
+
+    void operator()(int task_id, int num_total_tasks) {
       size_t num_elements = keys_.size();
       size_t elements_per_task = (num_elements + num_total_tasks - 1) / num_total_tasks;
       size_t start = elements_per_task * task_id;
@@ -105,10 +144,10 @@ public:
       
       for (size_t i = start; i < end; i++) {
         int key = keys_[i];
-        // mutex_.lock();
-        // std::cout << "insert " << key << std::endl;
-        // mutex_.unlock();
-        table_->Insert(key, key);
+        // std::unique_lock<std::shared_mutex> lock(mutex_);
+        std::cout << "remove " << key << std::endl;
+        // lock.unlock();
+        table_->Remove(key);
       }
     }
 };
@@ -116,13 +155,19 @@ public:
 TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
   ExtendibleHashTable<int, int> table(4);
   std::vector<int> keys;
-  std::vector<int> delete_keys={10, 12, 13, 15, 8, 9, 1, 3};
+  std::vector<int> delete_keys;
   for(int i=0; i<1000; i++){
     keys.push_back(i);
   }
+  for(int i=0; i<1000; i++){
+    delete_keys.push_back(i);
+  }
   TaskUtil t(4);
   InsertTask task1(&table, keys);
-  t.run(&task1, 4);
+  DeleteTask task2(&table, delete_keys);
+  t.addTask(task1, 2);
+  t.addTask(task2, 2);
+  t.run();
   table.Show();
   int result;
   table.Find(100, result);
