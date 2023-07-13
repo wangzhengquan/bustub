@@ -52,7 +52,7 @@ class TasksUtil {
     size_t total_amount_works_;
 
     ReadyTask(int task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works)
-        : task_id_(task_id), work_(work), num_workers_(num_workers), total_amount_works_(total_amount_works) {}
+        : task_id_(task_id), work_(std::move(work)), num_workers_(num_workers), total_amount_works_(total_amount_works) {}
   };
 
   class WaitTask {
@@ -63,7 +63,7 @@ class TasksUtil {
     std::list<TaskID> deps{};
     size_t total_amount_works_;
     WaitTask(TaskID task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &_deps)
-        : task_id_(task_id), work_(work), num_workers_(num_workers), total_amount_works_(total_amount_works) {
+        : task_id_(task_id), work_(std::move(work)), num_workers_(num_workers), total_amount_works_(total_amount_works) {
       for (TaskID dep : _deps) {
         deps.push_back(dep);
       }
@@ -112,7 +112,7 @@ class TasksUtil {
       - num_threads: the maximum number of threads that the task system
         can use.
     */
-  TasksUtil(int num_threads);
+  explicit TasksUtil(int num_threads);
   ~TasksUtil();
 
   void run();
