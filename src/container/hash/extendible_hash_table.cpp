@@ -59,33 +59,40 @@ auto ExtendibleHashTable<K, V>::GetNumBuckets() const -> int {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Find(const K &key, V &value) -> bool {
-  size_t bucket_index = IndexOf(key);
   std::shared_lock<std::shared_mutex> lock(mutex_);
-  // Search for the key in the bucket using the "Find" function of the bucket
-  if (dir_[bucket_index]->Find(key, value)) {
-    // If the key is found, update the value parameter with the value associated with the key and return true
-    return true;
-  } else {
-    // If the key is not found, release the lock on the bucket and return false
+  Node *node = dir_[IndexOf(key)]->Find(key);
+  if(node == nullptr){
     return false;
   }
+  value = node->value.second;
+  return true;
+   
 }
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
   std::unique_lock<std::shared_mutex> lock(mutex_);
   std::shared_ptr<Bucket> bucket = dir_[IndexOf(key)];
-  return bucket->Remove(key);
+  Node *node = bucket->Find(key);
+  if(node == nullptr){
+    return false;
+  }
+  if(bucket->Remove(node)) {
+    --size_;
+    return true;
+  }
+  return false;
 }
 
 template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
-  int old_num_buckets_ = num_buckets_;
   std::unique_lock<std::shared_mutex> lock(mutex_);
+  int old_num_buckets_ = num_buckets_;
   // std::cout << "insert(" << key <<"," << value << ")"<< std::endl;
-  std::shared_ptr<Bucket> bucket = dir_[IndexOf(key)];
-  // bucket->Insert(key, value);
+  size_t bucket_index = IndexOf(key);
+  std::shared_ptr<Bucket> bucket = dir_[bucket_index];
   if (bucket->IsFull()) {
+    // extend dir
     if (bucket->GetDepth() == global_depth_) {
       int high_bit = 1 << global_depth_;
       num_buckets_ *= 2;
@@ -96,77 +103,138 @@ void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
         dir_[i + high_bit] = dir_[i];
       }
     }
+
+    // split bucket
     std::shared_ptr<Bucket> bucket0 = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth() + 1);
     std::shared_ptr<Bucket> bucket1 = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth() + 1);
     int local_hight_bit = 1 << (bucket->GetDepth());
-    for (const auto &[key2, value2] : bucket->GetItems()) {
-      std::shared_ptr<Bucket> new_buket = (std::hash<K>()(key2) & local_hight_bit) == 0 ? bucket0 : bucket1;
-      new_buket->Insert(key2, value2);
+    // split the bucket into two bucket according to the (bucket->GetDepth()+1)'th bit of the hash value of the node's key 
+    for(Node *node = bucket->list_; node != nullptr; node = node->next){
+      std::shared_ptr<Bucket> new_buket = (std::hash<K>()(node->value.first) & local_hight_bit) == 0 ? bucket0 : bucket1;
+      new_buket->InsertOrAssign(node->value.first, node->value.second);
     }
 
-    for (int i = std::hash<K>()(key) & (local_hight_bit - 1); i < num_buckets_; i += local_hight_bit) {
+    /* 
+     * All of the dir items whose index  has the same low 'bucket->GetDepth()' bits with 'bucket_index' points to the same bucket,
+     * All of them should be split into two buckets base on the (bucket->GetDepth()+1)'th bit of their corresponding index.
+     */
+    // int i = std::hash<K>()(key) & (local_hight_bit - 1)
+    for (int i = bucket_index & (local_hight_bit - 1); i < num_buckets_; i += local_hight_bit) {
+      // if bucket->GetDepth()'th bit of the i is 0 set dir_[i] points to bucket0, else to bucket1;
       dir_[i] = (i & local_hight_bit) == 0 ? bucket0 : bucket1;
     }
   }
 
-  bucket = dir_[IndexOf(key)];
-  bucket->Insert(key, value);
+  bucket_index = IndexOf(key);
+  bucket = dir_[bucket_index];
+  auto [node, is_insert] = bucket->InsertOrAssign(key, value);
+  if(is_insert){
+    size_++;
+  }
+      
 }
 
 template <typename K, typename V>
-void ExtendibleHashTable<K, V>::show() {
+void ExtendibleHashTable<K, V>::Show() {
+  std::cout << "---------- Table Structure -----------" << std::endl;
   std::cout << "Gloable depth = " << global_depth_ << std::endl;
   for (int i = 0; i < num_buckets_; i++) {
     std::shared_ptr<Bucket> bucket = dir_[i];
-    std::bitset<4> bits(i);
-    std::cout << bits << "(" << bucket->GetDepth() << ")"
-              << ":";
-
-    for (const auto &[key, value] : bucket->GetItems()) {
-      std::cout << key << ", ";
+    std::bitset<32> bits(i);
+    std::cout << bits << "(depth=" << bucket->GetDepth() << ")" << " : ";
+              
+    for(Node *node = bucket->list_; node != nullptr; node = node->next){
+      // std::cout << "(" << node->value.first << ", " << node->value.second << ") ";
+       std::cout << "(" << node->value.first  << ") ";
     }
     std::cout << std::endl;
   }
+  std::cout << "--------------------------------------" << std::endl;
 }
 
 //===--------------------------------------------------------------------===//
 // Bucket
 //===--------------------------------------------------------------------===//
 template <typename K, typename V>
-ExtendibleHashTable<K, V>::Bucket::Bucket(size_t size, int depth) : size_(size), depth_(depth) {}
-
-template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::Bucket::Find(const K &key, V &value) -> bool {
-  auto it = std::find_if(list_.begin(), list_.end(), [&key](std::pair<K, V> &item) { return item.first == key; });
-  if (it != list_.end()) {
-    value = it->second;
-    return true;
-  }
-  return false;
+ExtendibleHashTable<K, V>::Bucket::Bucket(size_t capcity, int depth) : capcity_(capcity), depth_(depth) {
+  std::cout << "Bucket construct" << std::endl;
 }
 
 template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::Bucket::Remove(const K &key) -> bool {
-  auto it = std::find_if(list_.begin(), list_.end(), [&key](std::pair<K, V> &item) { return item.first == key; });
-  if (it != list_.end()) {
-    list_.erase(it);
-    return true;
-  }
-  return false;
+ExtendibleHashTable<K, V>::Bucket::~Bucket(){
+  // std::cout << "~Bucket" << std::endl;
+  Clear();
 }
 
 template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::Bucket::Insert(const K &key, const V &value) -> bool {
-  // UNREACHABLE("not implemented");
-  auto it = std::find_if(list_.begin(), list_.end(), [&key](std::pair<K, V> &item) { return item.first == key; });
-  if (it != list_.end()) {
-    it->second = value;
-    return true;
-  } else if (!IsFull()) {
-    list_.push_back({key, value});
-    return true;
+void ExtendibleHashTable<K, V>::Bucket::Clear(){
+  Node *node = list_;
+  while (node != nullptr) {
+    auto temp = node;
+    node = node->next;
+    delete temp;
+    // temp = nullptr;
   }
-  return false;
+  list_ = nullptr;
+  size_ = 0;
+  depth_ = 0;
+}
+
+template <typename K, typename V>
+auto ExtendibleHashTable<K, V>::Bucket::Find(const K &key) -> Node * {
+  for( Node *node = list_; node != nullptr; node = node->next){
+    if(node->value.first == key ){
+      return node;
+    }
+    
+  }
+  return nullptr;
+}
+
+
+template <typename K, typename V>
+auto ExtendibleHashTable<K, V>::Bucket::Remove(const Node *node) -> bool {
+  if(node == nullptr){
+    return false;
+  }
+  if(node->pre != nullptr){
+    node->pre->next = node->next;
+  } 
+
+  if(node->next != nullptr){
+    node->next->pre = node->pre;
+  } 
+
+  if(node == list_) {
+    list_ = node->next;
+  }
+  
+
+  delete node;
+  --size_;
+  return true;
+}
+
+template <typename K, typename V>
+auto ExtendibleHashTable<K, V>::Bucket::InsertOrAssign(const K &key, const V &value) -> std::pair<Node*, bool> {
+  for( Node *node = list_; node != nullptr; node = node->next){
+    if(node->value.first == key ){
+      node->value.second = value;
+      return {node, false};
+    }
+  }
+  if (!IsFull()) {
+    Node * node = new Node({key, value}, list_);
+    if(list_ != nullptr){
+      list_->pre = node;
+    }
+    
+    list_ = node;
+    size_++;
+    return {node, true};
+  }
+
+  return {nullptr, false};
 }
 
 template class ExtendibleHashTable<page_id_t, Page *>;

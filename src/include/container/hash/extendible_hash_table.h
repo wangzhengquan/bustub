@@ -35,8 +35,9 @@ namespace bustub {
  */
 template <typename K, typename V>
 class ExtendibleHashTable : public HashTable<K, V> {
+  
  public:
-  using element_type = std::pair<K, V>;
+  using ElementType = std::pair<K, V>;
   /**
    *
    * TODO(P1): Add implementation
@@ -107,17 +108,29 @@ class ExtendibleHashTable : public HashTable<K, V> {
    */
   auto Remove(const K &key) -> bool override;
 
-  void show();
+  void Show();
 
+
+ private:
+  struct Node {
+    ElementType value;
+    Node* next;
+    Node* pre;
+    Node(const ElementType& v = ElementType(), Node* n = nullptr, Node* p = nullptr) :
+        value(v), next(n), pre(p) {}
+  };
   /**
    * Bucket class for each hash table bucket that the directory points to.
    */
   class Bucket {
    public:
-    explicit Bucket(size_t size, int depth = 0);
+    friend class ExtendibleHashTable;
+    explicit Bucket(size_t capcity, int depth = 0);
+    ~Bucket();
+
 
     /** @brief Check if a bucket is full. */
-    inline auto IsFull() const -> bool { return list_.size() == size_; }
+    inline auto IsFull() const -> bool { return size_ >= capcity_; }
 
     /** @brief Get the local depth of the bucket. */
     inline auto GetDepth() const -> int { return depth_; }
@@ -125,50 +138,43 @@ class ExtendibleHashTable : public HashTable<K, V> {
     /** @brief Increment the local depth of a bucket. */
     inline void IncrementDepth() { depth_++; }
 
-    inline auto GetItems() -> std::list<std::pair<K, V>> & { return list_; }
-
+    inline auto GetSize() const -> size_t { return size_; }
+    inline auto GetList() const -> Node * { return list_; }
     /**
-     *
-     * TODO(P1): Add implementation
      *
      * @brief Find the value associated with the given key in the bucket.
      * @param key The key to be searched.
      * @param[out] value The value associated with the key.
      * @return True if the key is found, false otherwise.
      */
-    auto Find(const K &key, V &value) -> bool;
+    auto Find(const K &key) -> Node *;
 
     /**
-     *
-     * TODO(P1): Add implementation
-     *
      * @brief Given the key, remove the corresponding key-value pair in the bucket.
      * @param key The key to be deleted.
      * @return True if the key exists, false otherwise.
      */
-    auto Remove(const K &key) -> bool;
+    // auto remove(const K &key) -> bool;
+    auto Remove(const Node *node) -> bool;
 
     /**
-     *
-     * TODO(P1): Add implementation
-     *
      * @brief Insert the given key-value pair into the bucket.
      *      1. If a key already exists, the value should be updated.
      *      2. If the bucket is full, do nothing and return false.
      * @param key The key to be inserted.
      * @param value The value to be inserted.
-     * @return True if the key-value pair is inserted, false otherwise.
+     * @return The bool component is true if the insertion took place and false if the assignment took place. 
+     *         The Node * component is pointing at the element that was inserted or updated
      */
-    auto Insert(const K &key, const V &value) -> bool;
+    auto InsertOrAssign(const K &key, const V &value) -> std::pair<Node *, bool>;
 
-   private:
-    // TODO(student): You may add additional private members and helper functions
-    const size_t size_;
+    void Clear();
+
+    const size_t capcity_;
+    size_t size_ = 0;
     int depth_;
-    std::list<std::pair<K, V>> list_;
+    Node *list_ = nullptr;
   };
-
- private:
   // TODO(student): You may add additional private members and helper functions and remove the ones
   // you don't need.
 
@@ -177,7 +183,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
   int num_buckets_;     // The number of buckets in the hash table
   mutable std::shared_mutex mutex_;
   std::vector<std::shared_ptr<Bucket>> dir_;  // The directory of the hash table
-
+  size_t size_;
   // The following functions are completely optional, you can delete them if you have your own ideas.
 
   /**
@@ -201,5 +207,6 @@ class ExtendibleHashTable : public HashTable<K, V> {
   // auto GetLocalDepthInternal(int dir_index) const -> int;
   // auto GetNumBucketsInternal() const -> int;
 };
+ 
 
 }  // namespace bustub
