@@ -14,13 +14,16 @@ const char *TaskUtil::name() { return "Parallel + Thread Pool + Sleep"; }
 TaskUtil::TaskUtil(int num_threads) : num_threads_(num_threads) {};
 
 void TaskUtil::run(){
+  if(ready_queue.state_ != State::Ready){
+    return;
+  }
   _threads_pool.reserve(num_threads_);
 
   for (int i = 0; i < num_threads_; i++) {
     _threads_pool.emplace_back([&]() {
       while (true) {
         std::unique_lock<std::mutex> ready_queue_lock(ready_queue.mutex);
-        if (ready_queue.stop) {
+        if (ready_queue.state_ == State::Terminated) {
           // std::cout << "stop "<< my_stopi << std::endl;
           my_stopi++;
           ready_queue_lock.unlock();
@@ -98,10 +101,13 @@ TaskUtil::~TaskUtil() {
   // std::cout << "=========~TaskUtil"  << std::endl ;
   sync();
   std::unique_lock<std::mutex> lock(ready_queue.mutex);
-  ready_queue.stop = true;
+  // ready_queue.stop = true;
+  ready_queue.state_ = State::Terminated;
   lock.unlock();
   ready_queue.cv.notify_all();
-  for (auto &thread : _threads_pool) thread.join();
+  for (auto &thread : _threads_pool) {
+    thread.join();
+  }
 }
 
 void TaskUtil::addTask(std::function<void(int, int)> runnable, int num_task_workers) {

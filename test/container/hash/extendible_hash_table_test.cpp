@@ -165,9 +165,12 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
   TaskUtil t(4);
   InsertTask task1(&table, keys);
   DeleteTask task2(&table, delete_keys);
+  t.run();
   t.addTask(task1, 2);
   t.addTask(task2, 2);
-  t.run();
+
+  t.sync();
+  
   table.Show();
   int result;
   table.Find(100, result);

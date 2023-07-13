@@ -33,6 +33,7 @@ typedef int TaskID;
 
 class TaskUtil {
  private:
+  enum class State { Ready = 0, Running, Terminated };
   class ReadyTask {
    public:
     TaskID task_id_;
@@ -74,7 +75,8 @@ class TaskUtil {
     std::mutex mutex;
     std::condition_variable cv;
     std::queue<std::shared_ptr<ReadyTask> > queue{};
-    bool stop{false};
+    State state_ = State::Ready;
+    // bool stop{false};
 
     std::mutex num_tasks_complete_mutex;
     std::condition_variable num_tasks_complete_cv;
@@ -97,6 +99,7 @@ class TaskUtil {
   CompleteQueue complete_queue;
   int my_stopi = 0;
   int num_threads_;
+  
 
  public:
   /*
