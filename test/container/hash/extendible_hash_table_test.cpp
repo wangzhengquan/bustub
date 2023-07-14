@@ -100,8 +100,6 @@ public:
 };
  
 TEST(ExtendibleHashTableTest, MyConcurrentTest1) {
-  
-  std::cout << "====MyConcurrentTest1" << std::endl;
   // 16,4,6,22,24,10,31,7,9,20,26.
   ExtendibleHashTable<int, int> table(4);
   std::vector<int> keys;
@@ -124,8 +122,44 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest1) {
   EXPECT_EQ(keys.size(), table.GetSize());
    
 }
-
 TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
+  // 16,4,6,22,24,10,31,7,9,20,26.
+  ExtendibleHashTable<int, int> table(4);
+  std::vector<int> keys;
+  for(int i=0; i<20000; i++){
+    keys.push_back(i);
+  }
+  TasksUtil t(8);
+  std::list<TaskID> dep1;
+  TaskID task_id = t.addTask([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = keys[i];
+        // std::unique_lock<std::shared_mutex> lock(mutex_);
+        // std::cout << "insert " << key << std::endl;
+        // lock.unlock();
+        table.Insert(key, key);
+      }
+  }, 4, keys.size());
+  dep1.push_back(task_id);
+
+  
+  t.addTaskWithDeps([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = keys[i];
+        // std::unique_lock<std::shared_mutex> lock(mutex_);
+        // std::cout << "insert " << key << std::endl;
+        // lock.unlock();
+        EXPECT_EQ(table.Remove(key), true);
+      }
+  }, 4, keys.size(), dep1);
+  t.run();
+  // table.Show();
+
+  EXPECT_EQ(0, table.GetSize());
+   
+}
+
+TEST(ExtendibleHashTableTest, MyConcurrentTest3) {
   std::mutex mutex;
   ExtendibleHashTable<int, int> table(4);
   std::vector<int> keys;
@@ -172,11 +206,7 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
       EXPECT_EQ(exist, false);
     }
   }
-  
 }
-
-
-
 
 TEST(ExtendibleHashTableTest, DISABLED_MyConcurrentTest) {
   ExtendibleHashTable<int, int> table(4);

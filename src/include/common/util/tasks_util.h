@@ -44,30 +44,33 @@ class TasksUtil {
     WorkFunction work_;
      
     size_t worker_id_{0};
-    size_t num_workers_{0};
+    const size_t num_workers_;
     std::mutex mutex;
     std::condition_variable cv;
     size_t num_workers_completed{0};
 
-    size_t total_amount_works_;
+    const size_t total_amount_works_;
 
     ReadyTask(int task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works)
-        : task_id_(task_id), work_(std::move(work)), num_workers_(num_workers), total_amount_works_(total_amount_works) {}
+        : task_id_(task_id), 
+          work_(std::move(work)), 
+          num_workers_(num_workers), 
+          total_amount_works_(total_amount_works) {}
   };
 
   class WaitTask {
    public:
     TaskID task_id_;
     WorkFunction work_;
-    size_t num_workers_;
-    std::list<TaskID> deps{};
-    size_t total_amount_works_;
-    WaitTask(TaskID task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &_deps)
-        : task_id_(task_id), work_(std::move(work)), num_workers_(num_workers), total_amount_works_(total_amount_works) {
-      for (TaskID dep : _deps) {
-        deps.push_back(dep);
-      }
-    }
+    const size_t num_workers_;
+    const size_t total_amount_works_;
+    std::list<TaskID> deps_{};
+    WaitTask(TaskID task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works, std::list<TaskID> &deps)
+        : task_id_(task_id), 
+          work_(std::move(work)), 
+          num_workers_(num_workers), 
+          total_amount_works_(total_amount_works),
+          deps_(std::move(deps)) {}
   };
 
   class CompleteQueue {
@@ -82,7 +85,6 @@ class TasksUtil {
     std::condition_variable cv;
     std::queue<std::shared_ptr<ReadyTask> > queue{};
     State state_ = State::Ready;
-    // bool stop{false};
 
     std::mutex num_tasks_complete_mutex;
     std::condition_variable num_tasks_complete_cv;
@@ -97,12 +99,12 @@ class TasksUtil {
     std::condition_variable cv;
   };
 
-  std::vector<std::thread> _threads_pool;
-  int next_task_id_{0};
+  std::vector<std::thread> workers_;
+  TaskID next_task_id_{0};
   ReadyQueue ready_queue;
   WaitQueue wait_queue;
   CompleteQueue complete_queue;
-  int num_threads_;
+  const size_t total_num_workers_;
   
 
  public:
@@ -112,7 +114,7 @@ class TasksUtil {
       - num_threads: the maximum number of threads that the task system
         can use.
     */
-  explicit TasksUtil(int num_threads);
+  explicit TasksUtil(int total_num_workers);
   ~TasksUtil();
 
   void run();
@@ -122,7 +124,7 @@ class TasksUtil {
     will return only when the execution of all tasks is
     complete.
   */
-  void addTask(WorkFunction work, size_t num_workers, size_t total_amount_works);
+  TaskID addTask(WorkFunction work, size_t num_workers, size_t total_amount_works);
 
   /*
     Executes an asynchronous bulk task launch of
@@ -142,7 +144,7 @@ class TasksUtil {
     runAsnycWithDeps() to specify a dependency of some future
     bulk task launch on this bulk task launch.
     */
-  void addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &deps);
+  TaskID addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, std::list<TaskID> &deps);
 
   /*
     Blocks until all tasks created as a result of **any prior**

@@ -9,16 +9,16 @@
  * ================================================================
  */
 
-TasksUtil::TasksUtil(int num_threads) : num_threads_(num_threads) {};
+TasksUtil::TasksUtil(int total_num_workers) : total_num_workers_(total_num_workers) {};
 
 void TasksUtil::run(){
   if(ready_queue.state_ != State::Ready){
     return;
   }
-  _threads_pool.reserve(num_threads_);
+  workers_.reserve(total_num_workers_);
 
-  for (int i = 0; i < num_threads_; i++) {
-    _threads_pool.emplace_back([&]() {
+  for (size_t i = 0; i < total_num_workers_; i++) {
+    workers_.emplace_back([&]() {
       while (true) {
         std::unique_lock<std::mutex> ready_queue_lock(ready_queue.mutex);
         if (ready_queue.state_ == State::Terminated) {
@@ -66,15 +66,15 @@ void TasksUtil::run(){
               std::unique_lock<std::mutex> wait_queue_lock(wait_queue.mutex);
               for (auto wait_queue_it = wait_queue.queue.begin(); wait_queue_it != wait_queue.queue.end();) {
                 WaitTask &wait_task = *wait_queue_it;
-                for (auto it = wait_task.deps.begin(); it != wait_task.deps.end();) {
+                for (auto it = wait_task.deps_.begin(); it != wait_task.deps_.end();) {
                   if (*it == ready_task->task_id_) {
-                    it = wait_task.deps.erase(it);
+                    it = wait_task.deps_.erase(it);
                     break;
                   } else
                     ++it;
                 }
 
-                if (wait_task.deps.empty()) {
+                if (wait_task.deps_.empty()) {
                   ready_queue_lock.lock();
                   ready_queue.queue.push(std::shared_ptr<ReadyTask>(
                       new ReadyTask{wait_task.task_id_, wait_task.work_, wait_task.num_workers_, wait_task.total_amount_works_}));
@@ -105,19 +105,19 @@ TasksUtil::~TasksUtil() {
   ready_queue.state_ = State::Terminated;
   lock.unlock();
   ready_queue.cv.notify_all();
-  for (auto &thread : _threads_pool) {
+  for (auto &thread : workers_) {
     thread.join();
   }
 }
 
-void TasksUtil::addTask(WorkFunction work, size_t num_workers, size_t total_amount_works) {
-  const std::vector<TaskID> deps;
-  addTaskWithDeps(std::move(work), num_workers, total_amount_works, deps);
+TaskID TasksUtil::addTask(WorkFunction work, size_t num_workers, size_t total_amount_works) {
+  std::list<TaskID> deps;
+  return addTaskWithDeps(std::move(work), num_workers, total_amount_works, deps);
 }
 //runAsyncWithDeps
-void TasksUtil::addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &deps) {
-  ready_queue.num_total_tasks++;
-  std::vector<TaskID> newdeps;
+TaskID TasksUtil::addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, std::list<TaskID> &deps) {
+  ++ready_queue.num_total_tasks;
+  std::list<TaskID> newdeps;
   std::unique_lock<std::mutex> complete_queue_lock(complete_queue.mutex);
   for (TaskID dep : deps) {
     if (complete_queue.queue.find(dep) == complete_queue.queue.end()) {
@@ -128,28 +128,25 @@ void TasksUtil::addTaskWithDeps(WorkFunction work, size_t num_workers, size_t to
   if (newdeps.empty()) {
     complete_queue_lock.unlock();
     std::unique_lock<std::mutex> lock(ready_queue.mutex);
-    ready_queue.queue.push(std::shared_ptr<ReadyTask>(new ReadyTask{next_task_id_++, work, num_workers, total_amount_works}));
+    TaskID task_id = next_task_id_++;
+    ready_queue.queue.push(std::shared_ptr<ReadyTask>(new ReadyTask{task_id, work, num_workers, total_amount_works}));
     lock.unlock();
     ready_queue.cv.notify_all();
-    return ;
+    return task_id;
   } else {
     std::unique_lock<std::mutex> lock(wait_queue.mutex);
-    wait_queue.queue.push_back(WaitTask{next_task_id_++, work, num_workers, total_amount_works, newdeps});
+    TaskID task_id = next_task_id_++;
+    wait_queue.queue.push_back(WaitTask{task_id, work, num_workers, total_amount_works, newdeps});
     complete_queue_lock.unlock();
     lock.unlock();
-    return ;
+    return task_id;
   }
 }
 
 void TasksUtil::sync() {
   std::unique_lock<std::mutex> lock(ready_queue.num_tasks_complete_mutex);
-  // std::cout << "=========sync"  << std::endl ;
   while (ready_queue.num_tasks_complete < ready_queue.num_total_tasks) {
-    // std::cout << "wait before ready_queue.num_bulks_complete="  <<  ready_queue.num_bulks_complete  << ",
-    // num_total_bulks= " << ready_queue.num_total_bulks << std::endl;
     ready_queue.num_tasks_complete_cv.wait(lock);
-    // std::cout << "wait after bulks.num_bulks_complete="  <<  bulks.num_bulks_complete  << ", num_total_bulks= " <<
-    // bulks.num_total_bulks << std::endl;
   }
   lock.unlock();
   return;
