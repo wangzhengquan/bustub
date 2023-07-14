@@ -17,34 +17,33 @@ namespace bustub {
 LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_frames), k_(k), frames_(num_frames) {}
 
 auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
-  frame_id_t max_kdis_frame_id;
-  size_t max_kdis = 0;
+  frame_id_t max_k_dist_frame_id;
+  size_t max_k_dist = 0;
   bool suc = false;
   std::unique_lock lock(mutex_);
   if (curr_size_ == 0) return false;
   for (size_t i = 0; i < frames_.size(); i++) {
-    std::shared_ptr<Frame> &frame = frames_[i];
-    if (!frame || !frame->GetEvictable()) {
+    std::shared_ptr<Frame> frame = frames_[i];
+    if (!frame || !frame->Evictable()) {
       continue;
     }
 
     suc = true;
-    size_t kdis = frame->GetKDistance(current_timestamp_);
-    if (kdis > max_kdis) {
-      max_kdis = kdis;
-      max_kdis_frame_id = i;
-    } else if (kdis == max_kdis) {
-      size_t dis = frame->GetDistance(current_timestamp_);
-      if (dis > frames_[max_kdis_frame_id]->GetDistance(current_timestamp_)) {
-        max_kdis_frame_id = i;
+    size_t k_dist = frame->KDistance(current_timestamp_);
+    if (k_dist > max_k_dist) {
+      max_k_dist = k_dist;
+      max_k_dist_frame_id = i;
+    } else if (k_dist == max_k_dist) {
+      if (frame->Distance(current_timestamp_) > frames_[max_k_dist_frame_id]->Distance(current_timestamp_)) {
+        max_k_dist_frame_id = i;
       }
     }
   }
 
   if (suc) {
-    frames_[max_kdis_frame_id] = nullptr;
+    frames_[max_k_dist_frame_id] = nullptr;
     curr_size_--;
-    *frame_id = max_kdis_frame_id;
+    *frame_id = max_k_dist_frame_id;
   }
 
   return suc;
@@ -68,7 +67,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool evictable) {
   if (!frame) {
     return;
   }
-  if (evictable == frame->GetEvictable()) return;
+  if (evictable == frame->Evictable()) return;
 
   evictable ? curr_size_++ : curr_size_--;
   frame->SetEvictable(evictable);
@@ -79,7 +78,7 @@ auto LRUKReplacer::Remove(frame_id_t frame_id) -> bool {
   std::unique_lock lock(mutex_);
   std::shared_ptr<Frame> &frame = frames_[frame_id];
   if (!frame) return false;
-  if (!frame->GetEvictable()) {
+  if (!frame->Evictable()) {
     throw std::invalid_argument("Remove is called on a non-evictable frame.");
     return false;
   }

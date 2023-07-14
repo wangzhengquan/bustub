@@ -145,21 +145,21 @@ class LRUKReplacer {
 
     void SetEvictable(bool evictable) { evictable_ = evictable; }
 
-    auto GetEvictable() -> bool { return evictable_; }
+    auto Evictable() -> bool { return evictable_; }
 
-    auto GetAccessHistories() -> std::list<size_t> { return access_histories_; }
+    auto AccessHistories() -> std::list<size_t> { return access_histories_; }
 
-    auto GetKDistance(size_t current_timestamp) -> size_t {
+    auto KDistance(size_t current_timestamp) -> size_t {
       if (access_histories_.size() < k_) return INT64_MAX;
       return current_timestamp - access_histories_.front();
     }
 
-    auto GetDistance(size_t current_timestamp) -> size_t {
+    auto Distance(size_t current_timestamp) -> size_t {
       if (access_histories_.empty()) return INT64_MAX;
       return current_timestamp - access_histories_.front();
     }
 
-   private:
+    
     std::list<size_t> access_histories_{};
     size_t k_;
     bool evictable_{};

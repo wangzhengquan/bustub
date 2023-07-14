@@ -130,7 +130,7 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
     keys.push_back(i);
   }
   TasksUtil t(8);
-  std::list<TaskID> dep1;
+  
   TaskID task_id = t.addTask([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
         int key = keys[i];
@@ -139,11 +139,12 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
         // lock.unlock();
         table.Insert(key, key);
       }
-  }, 4, keys.size());
+  }, 2, keys.size());
+  std::list<TaskID> dep1;
   dep1.push_back(task_id);
 
   
-  t.addTaskWithDeps([&](size_t from, size_t to){
+  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
         int key = keys[i];
         // std::unique_lock<std::shared_mutex> lock(mutex_);
@@ -151,11 +152,35 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
         // lock.unlock();
         EXPECT_EQ(table.Remove(key), true);
       }
-  }, 4, keys.size(), dep1);
+  }, 2, keys.size(), dep1);
+
+  std::list<TaskID> dep2;
+  dep2.push_back(task_id);
+  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = keys[i];
+        // std::unique_lock<std::shared_mutex> lock(mutex_);
+        // std::cout << "insert " << key << std::endl;
+        // lock.unlock();
+        table.Insert(key, key);
+      }
+  }, 2, keys.size(), dep2);
+
+  std::list<TaskID> dep3;
+  dep3.push_back(task_id);
+  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = keys[i];
+        int value;
+        bool exist = table.Find(key, value);
+        EXPECT_EQ(value, key);
+        EXPECT_EQ(exist, true);
+      }
+  }, 2, keys.size(), dep3);
   t.run();
   // table.Show();
 
-  EXPECT_EQ(0, table.GetSize());
+  EXPECT_EQ(keys.size(), table.GetSize());
    
 }
 
