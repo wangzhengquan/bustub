@@ -14,6 +14,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <list>
 
 #include "common/config.h"
 #include "common/rwlatch.h"
@@ -28,6 +29,7 @@ namespace bustub {
 class Page {
   // There is book-keeping information inside the page that should only be relevant to the buffer pool manager.
   friend class BufferPoolManagerInstance;
+  friend class LRUKReplacer;
 
  public:
   /** Constructor. Zeros out the page data. */
@@ -88,6 +90,56 @@ class Page {
   bool is_dirty_ = false;
   /** Page latch. */
   ReaderWriterLatch rwlatch_;
+
+// for lru_k
+public:
+  void RecordAccess(size_t timestamp) {
+    pin_count_++;
+    access_histories_.push_back(timestamp);
+    if (access_histories_.size() > k_) {
+      access_histories_.pop_front();
+    }
+  }
+
+  //void SetEvictable(bool evictable) { evictable_ = evictable; }
+
+  auto Evictable() -> bool { return pin_count_ == 0; }
+
+  // auto AccessHistories() -> std::list<size_t> { return access_histories_; }
+
+  auto KDistance(size_t current_timestamp) -> size_t {
+    if (access_histories_.size() < k_) return INT64_MAX;
+    return current_timestamp - access_histories_.front();
+  }
+
+  auto Distance(size_t current_timestamp) -> size_t {
+    if (access_histories_.empty()) return INT64_MAX;
+    return current_timestamp - access_histories_.front();
+  }
+  
+  // void ClearHistory(){
+  //   access_histories_.clear();
+  // }
+  void SetK(size_t k){
+    k_ = k;
+  }
+
+  auto Removed() -> bool{
+    return page_id_ == INVALID_PAGE_ID;;
+  }
+
+  auto Remove() -> bool{
+    if(Removed()) 
+      return true;
+    BUSTUB_ASSERT(Evictable(), "Remove a Un Evictable frame.");
+    page_id_ = INVALID_PAGE_ID;
+    pin_count_ = 0;
+    access_histories_.clear();
+    return true;
+  }
+  
+  std::list<size_t> access_histories_{};
+  size_t k_;
 };
 
 }  // namespace bustub

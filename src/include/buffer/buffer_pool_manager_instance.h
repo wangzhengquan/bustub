@@ -54,7 +54,6 @@ class BufferPoolManagerInstance : public BufferPoolManager {
 
  protected:
   /**
-   * TODO(P1): Add implementation
    *
    * @brief Create a new page in the buffer pool. Set page_id to the new page's id, or nullptr if all frames
    * are currently in use and not evictable (in another word, pinned).
@@ -73,8 +72,6 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto NewPgImp(page_id_t *page_id) -> Page * override;
 
   /**
-   * TODO(P1): Add implementation
-   *
    * @brief Fetch the requested page from the buffer pool. Return nullptr if page_id needs to be fetched from the disk
    * but all frames are currently in use and not evictable (in another word, pinned).
    *
@@ -106,7 +103,6 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto UnpinPgImp(page_id_t page_id, bool is_dirty) -> bool override;
 
   /**
-   * TODO(P1): Add implementation
    *
    * @brief Flush the target page to disk.
    *
@@ -119,14 +115,12 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto FlushPgImp(page_id_t page_id) -> bool override;
 
   /**
-   * TODO(P1): Add implementation
    *
    * @brief Flush all the pages in the buffer pool to disk.
    */
   void FlushAllPgsImp() override;
 
   /**
-   * TODO(P1): Add implementation
    *
    * @brief Delete a page from the buffer pool. If page_id is not in the buffer pool, do nothing and return true. If the
    * page is pinned and cannot be deleted, return false immediately.
@@ -139,11 +133,12 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    * @return false if the page exists but could not be deleted, true if the page didn't exist or deletion succeeded
    */
   auto DeletePgImp(page_id_t page_id) -> bool override;
-
+  
+private:
   /** Number of pages in the buffer pool. */
   const size_t pool_size_;
   /** The next page id to be allocated  */
-  std::atomic<page_id_t> next_page_id_ = 0;
+  std::atomic<page_id_t> next_page_id_ {0};
   /** Bucket size for the extendible hash table */
   const size_t bucket_size_ = 4;
 
@@ -155,12 +150,18 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   LogManager *log_manager_ __attribute__((__unused__));
   /** Page table for keeping track of buffer pool pages. */
   ExtendibleHashTable<page_id_t, frame_id_t> *page_table_;
+  // ReaderWriterLatch page_table_latch_;
   /** Replacer to find unpinned pages for replacement. */
-  LRUKReplacer *replacer_;
+  // LRUKReplacer *replacer_;
   /** List of free frames that don't have any pages on them. */
   std::list<frame_id_t> free_list_;
+  ReaderWriterLatch free_list_latch_;
   /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
-  std::mutex free_list_mutex_;
+  // std::mutex mutex_;
+  ReaderWriterLatch latch_;
+  
+  std::atomic<size_t> current_timestamp_{0};
+  
 
   /**
    * @brief Allocate a page on disk. Caller should acquire the latch before calling this function.
@@ -176,6 +177,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
     // This is a no-nop right now without a more complex data structure to track deallocated pages
   }
 
-  // TODO(student): You may add additional private members and helper functions
+  auto Victim(frame_id_t *frame_id) -> bool ;
+  auto Evict() -> frame_id_t;
 };
+
 }  // namespace bustub

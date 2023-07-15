@@ -21,7 +21,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
   size_t max_k_dist = 0;
   bool suc = false;
   std::unique_lock lock(mutex_);
-  if (curr_size_ == 0) return false;
+  if (evictable_size_ == 0) return false;
   for (size_t i = 0; i < frames_.size(); i++) {
     std::shared_ptr<Frame> frame = frames_[i];
     if (!frame || !frame->Evictable()) {
@@ -42,7 +42,7 @@ auto LRUKReplacer::Evict(frame_id_t *frame_id) -> bool {
 
   if (suc) {
     frames_[max_k_dist_frame_id] = nullptr;
-    curr_size_--;
+    evictable_size_--;
     *frame_id = max_k_dist_frame_id;
   }
 
@@ -57,7 +57,7 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id) {
     frame = std::make_shared<Frame>(k_);
     frames_[frame_id] = frame;
   }
-  frame->RecordAccess(current_timestamp_++);
+  frame->RecordAccess(++current_timestamp_);
 }
 
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool evictable) {
@@ -69,7 +69,7 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool evictable) {
   }
   if (evictable == frame->Evictable()) return;
 
-  evictable ? curr_size_++ : curr_size_--;
+  evictable ? evictable_size_++ : evictable_size_--;
   frame->SetEvictable(evictable);
 }
 
@@ -84,13 +84,13 @@ auto LRUKReplacer::Remove(frame_id_t frame_id) -> bool {
   }
 
   frames_[frame_id] = nullptr;
-  curr_size_--;
+  evictable_size_--;
   return true;
 }
 
 auto LRUKReplacer::Size() -> size_t {
   std::unique_lock lock(mutex_);
-  return curr_size_;
+  return evictable_size_;
 }
 
 }  // namespace bustub

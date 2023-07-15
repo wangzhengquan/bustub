@@ -23,7 +23,6 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManag
   // we allocate a consecutive memory space for the buffer pool
   pages_ = new Page[pool_size_];
   page_table_ = new ExtendibleHashTable<page_id_t, frame_id_t>(bucket_size_);
-  replacer_ = new LRUKReplacer(pool_size, replacer_k);
 
   // Initially, every page is in the free list.
   for (size_t i = 0; i < pool_size_; ++i) {
@@ -39,107 +38,129 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManag
 BufferPoolManagerInstance::~BufferPoolManagerInstance() {
   delete[] pages_;
   delete page_table_;
-  delete replacer_;
+  // delete replacer_;
 }
 
 auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   frame_id_t frame_id;
-  std::unique_lock free_list_lock(free_list_mutex_);
+
+  free_list_latch_.WLock();
   if (!free_list_.empty()) {
     frame_id = free_list_.front();
     free_list_.pop_front();
-    free_list_lock.unlock();
+    free_list_latch_.WUnlock();
   } else {
-    free_list_lock.unlock();
-    if (!replacer_->Evict(&frame_id)) {
-      BUSTUB_ASSERT(false, "NewPgImp nullptr \n ");
+    free_list_latch_.WUnlock();
+
+    // evict
+    latch_.WLock();
+    // BUSTUB_ASSERT(Victim(&frame_id), "no available frame \n ");
+    if(!Victim(&frame_id)){
+      latch_.WUnlock();
       return nullptr;
     }
+    Page &old_page = pages_[frame_id];
+    old_page.WLatch();
+    page_table_->Remove(old_page.page_id_);
+    latch_.WUnlock();
+    
+    if (old_page.IsDirty()) {
+      disk_manager_->WritePage(old_page.GetPageId(), old_page.GetData());
+      old_page.is_dirty_ = false;
+    }
+    old_page.Remove();
+    old_page.WUnlatch();
   }
   page_id_t new_page_id = AllocatePage();
 
   Page &page = pages_[frame_id];
-  if (page.page_id_ != INVALID_PAGE_ID) {
-    page_table_->Remove(page.page_id_);
-  }
   page.WLatch();
-  if (page.IsDirty()) {
-    disk_manager_->WritePage(page.GetPageId(), page.GetData());
-  }
   page.is_dirty_ = true;
   page.ResetMemory();
   page.page_id_ = new_page_id;
-  page.pin_count_ = 1;
-  page.WUnlatch();
-  replacer_->RecordAccess(frame_id);
-  replacer_->SetEvictable(frame_id, false);
+  page.RecordAccess(++current_timestamp_);
   page_table_->Insert(new_page_id, frame_id);
 
-  if (page_id != nullptr) *page_id = new_page_id;
+  if (page_id != nullptr) {
+    *page_id = new_page_id;
+  }
+  page.WUnlatch();
   return &page;
 }
 
 auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   frame_id_t frame_id;
+
+  latch_.RLock();
   if (page_table_->Find(page_id, frame_id)) {
     Page &page = pages_[frame_id];
     page.WLatch();
-    page.pin_count_++;
+    page.RecordAccess(++current_timestamp_);
+    latch_.RUnlock();
     page.WUnlatch();
-    replacer_->RecordAccess(frame_id);
-    replacer_->SetEvictable(frame_id, false);
     return &page;
   }
+  latch_.WUnlock();
 
-  std::unique_lock free_list_lock(free_list_mutex_);
+  free_list_latch_.WLock();
   if (!free_list_.empty()) {
     frame_id = free_list_.front();
     free_list_.pop_front();
-    free_list_lock.unlock();
+    free_list_latch_.WUnlock();
   } else {
-    free_list_lock.unlock();
-    if (!replacer_->Evict(&frame_id)) {
+    free_list_latch_.WUnlock();
+
+    // evict
+    latch_.WLock();
+    // BUSTUB_ASSERT(Victim(&frame_id), "FetchPgImp, no available frame \n ");
+    if(!Victim(&frame_id)){
+      latch_.WUnlock();
       return nullptr;
     }
+    Page &old_page = pages_[frame_id];
+    old_page.WLatch();
+    page_table_->Remove(old_page.page_id_);
+    latch_.WUnlock();
+
+    if (old_page.IsDirty()) {
+      disk_manager_->WritePage(old_page.GetPageId(), old_page.GetData());
+      old_page.is_dirty_ = false;
+    }
+    old_page.Remove();
+    old_page.WUnlatch();
   }
 
   Page &page = pages_[frame_id];
-  if (page.page_id_ != INVALID_PAGE_ID) {
-    page_table_->Remove(page.page_id_);
-  }
   page.WLatch();
-  if (page.IsDirty()) {
-    disk_manager_->WritePage(page.GetPageId(), page.GetData());
-    page.is_dirty_ = false;
-  }
   page.ResetMemory();
+  page.is_dirty_ = false;
   page.page_id_ = page_id;
-  page.pin_count_ = 1;
+  page.RecordAccess(++current_timestamp_);
   disk_manager_->ReadPage(page_id, page.GetData());
-  page.WUnlatch();
-  replacer_->RecordAccess(frame_id);
-  replacer_->SetEvictable(frame_id, false);
   page_table_->Insert(page_id, frame_id);
+  page.WUnlatch();
 
   return &page;
 }
 
 auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> bool {
   frame_id_t frame_id;
+
+  latch_.RLock();
   if (!page_table_->Find(page_id, frame_id)) {
+    latch_.RUnlock();
     return false;
   }
+
   Page &page = pages_[frame_id];
   page.WLatch();
+  latch_.RUnlock();
   if (page.pin_count_ == 0) {
     page.WUnlatch();
     return false;
   }
   page.pin_count_--;
   page.is_dirty_ = is_dirty;
-  if (page.pin_count_ == 0) {
-    replacer_->SetEvictable(frame_id, true);
-  }
   page.WUnlatch();
   return true;
 }
@@ -147,12 +168,16 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
 auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   BUSTUB_ASSERT(page_id != INVALID_PAGE_ID, "page_id cannot be INVALID_PAGE_ID)");
   frame_id_t frame_id;
+  latch_.RLock();
   if (!page_table_->Find(page_id, frame_id)) {
+    latch_.RUnlock();
     return false;
   }
 
   Page &page = pages_[frame_id];
   page.WLatch();
+  latch_.RUnlock();
+
   disk_manager_->WritePage(page.GetPageId(), page.GetData());
   page.is_dirty_ = false;
   page.WUnlatch();
@@ -175,34 +200,84 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
 
 auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   frame_id_t frame_id;
+  latch_.WLock();
   if (!page_table_->Find(page_id, frame_id)) {
-    // Although it is required to return true here, I believe that returning false is more appropriate.
-    return false;
+    latch_.WUnlock();
+    return true;
   }
-
   Page &page = pages_[frame_id];
   page.WLatch();
-  if (page.GetPinCount() > 0) {
+  if (!page.Evictable() ) {
     page.WUnlatch();
     return false;
   }
   page_table_->Remove(page_id);
+  latch_.WUnlock();
+  
+  page.Remove();
   page.ResetMemory();
-  page.page_id_ = INVALID_PAGE_ID;
-  page.pin_count_ = 0;
   page.is_dirty_ = false;
-  page.WUnlatch();
-
-  replacer_->SetEvictable(frame_id, true);
-  if (replacer_->Remove(frame_id)) {
-    std::unique_lock free_list_lock(free_list_mutex_);
-    free_list_.push_back(frame_id);
-    free_list_lock.unlock();
-  }
+ 
+  free_list_latch_.WLock();
+  free_list_.push_back(frame_id);
+  free_list_latch_.WUnlock();
   DeallocatePage(page_id);
+  page.WUnlatch();
   return true;
 }
 
 auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { return next_page_id_++; }
 
+auto BufferPoolManagerInstance::Evict() -> frame_id_t{
+  frame_id_t frame_id;
+  latch_.WLock();
+  BUSTUB_ASSERT(Victim(&frame_id), "no available frame \n ");
+  Page &old_page = pages_[frame_id];
+  page_table_->Remove(old_page.page_id_);
+  old_page.WLatch();
+  latch_.WUnlock();
+  return frame_id;
+}
+
+auto BufferPoolManagerInstance::Victim(frame_id_t *frame_id) -> bool {
+  frame_id_t max_k_dist_frame_id = -1;
+  size_t max_k_dist = 0;
+  
+  // if (evictable_size_ == 0) return false;
+  for (size_t i = 0; i < pool_size_; i++) {
+    Page& frame = pages_[i];
+    frame.RLatch();
+    if(frame.Removed() || !frame.Evictable()){
+      frame.RUnlatch();
+      continue;
+    }
+    size_t k_dist = frame.KDistance(current_timestamp_);
+    if(max_k_dist_frame_id == -1){
+      max_k_dist = k_dist;
+      max_k_dist_frame_id = i;
+    }
+    else if (k_dist > max_k_dist) {
+      // frames_[max_k_dist_frame_id].RUnlatch();
+      max_k_dist = k_dist;
+      max_k_dist_frame_id = i;
+    } else if (k_dist == max_k_dist) {
+      if (frame.Distance(current_timestamp_) > pages_[max_k_dist_frame_id].Distance(current_timestamp_)) {
+        // frames_[max_k_dist_frame_id].RUnlatch();
+        max_k_dist_frame_id = i;
+      }
+    } else {
+      // frame.RUnlatch();
+    }
+    frame.RUnlatch();
+  }
+
+  if (max_k_dist_frame_id == -1) {
+    return false;
+  }
+  *frame_id = max_k_dist_frame_id;
+  return true;
+}
+
+
 }  // namespace bustub
+
