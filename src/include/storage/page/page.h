@@ -68,6 +68,10 @@ class Page {
   /** Sets the page LSN. */
   inline void SetLSN(lsn_t lsn) { memcpy(GetData() + OFFSET_LSN, &lsn, sizeof(lsn_t)); }
 
+  void Print()  {
+    std::cout << "page_id: " <<  page_id_ << ", pin_count: " << pin_count_ << std::endl;
+  }
+
  protected:
   static_assert(sizeof(page_id_t) == 4);
   static_assert(sizeof(lsn_t) == 4);

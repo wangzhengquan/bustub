@@ -51,7 +51,7 @@ void InsertHelper(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree, con
   for (size_t i = start; i < end; i++) {
     int64_t key = keys[i];
     mutex_.lock();
-    std::cout << "insert " << key << std::endl;
+    std::cout << "thread " << thread_id << " insert " << key << std::endl;
     mutex_.unlock();
 
     int64_t value = key & 0xFFFFFFFF;
@@ -344,25 +344,63 @@ TEST(BPlusTreeConcurrentTest, DISABLED_MixTest) {
   remove("test.log");
 }
 
-TEST(BPlusTreeConcurrentTest, MyTest) {
+TEST(BPlusTreeTests, DISABLED_BufferPoolManagerTest) {
+  // create KeyComparator and index schema
+  auto key_schema = ParseCreateStatement("a bigint");
+  GenericComparator<8> comparator(key_schema.get());
+
+  auto *disk_manager = new DiskManager("test.db");
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(10, disk_manager);
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  (void)header_page;
+  ASSERT_EQ(page_id, HEADER_PAGE_ID);
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
+  GenericKey<8> index_key;
+  RID rid;
+  // create transaction
+  auto *transaction = new Transaction(0);
+  
+  for (int64_t key = 1; key < 10; ++key) {
+    int64_t value = key & 0xFFFFFFFF;
+    rid.Set(static_cast<int32_t>(key >> 32), value);
+    index_key.SetFromInteger(key);
+    tree.Insert(index_key, rid, transaction);
+  }
+  tree.Draw(bpm, "tree2.dot");
+  
+  // tree.Print(bpm);
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+     std::cout << iterator->first << ",";
+  }
+  std::cout << std::endl;
+  bpm->UnpinPage(HEADER_PAGE_ID, true);
+  bpm->Print();
+
+  delete transaction;
+  delete disk_manager;
+  delete bpm;
+  remove("test.db");
+  remove("test.log");
+}
+
+TEST(BPlusTreeConcurrentTest, ConcurrentInsert1) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
   BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
-
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
 
-  // std::vector<int64_t> keys1 = {1, 2, 3, 4, 5};
-  // InsertHelper(&tree, keys1);
-  // first, populate index
-  int64_t num = 20;
+  int64_t num = 100;
   std::vector<int64_t> keys;
   for (int64_t i = 0; i < num; i++) {
     keys.push_back(i);
@@ -377,18 +415,25 @@ TEST(BPlusTreeConcurrentTest, MyTest) {
   // tree.Print(bpm);
 
   int64_t size = 0;
+  // int64_t pre = -1;
   for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-    std::cout << iterator->first << std::endl;
+    // int64_t cur = iterator->first;
+    // EXPECT_GT(cur, pre);
+    std::cout <<  iterator->first << " ";
+    // pre = cur;
     size = size + 1;
   }
-
+  std::cout << std::endl;
   EXPECT_EQ(size, num);
 
+  // bpm->Print();
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   delete disk_manager;
   delete bpm;
   remove("test.db");
   remove("test.log");
 }
+
+
 
 }  // namespace bustub

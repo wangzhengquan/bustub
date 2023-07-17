@@ -35,6 +35,7 @@
 
 #include <ctime>
 #include <string>
+#include <mutex>
 
 namespace bustub {
 
@@ -75,7 +76,7 @@ static constexpr int LOG_LEVEL_ALL = 0;
 static constexpr int LOG_LEVEL = LOG_LEVEL_DEBUG;
 #else
 // #pragma message("LOG_LEVEL_WARN is used instead as DEBUG option is off.")
-static constexpr int LOG_LEVEL = LOG_LEVEL_WARN;
+static constexpr int LOG_LEVEL = LOG_LEVEL_INFO;
 #endif
 // #pragma message("Give LOG_LEVEL compile option to overwrite the default
 // level.")
@@ -87,6 +88,15 @@ static constexpr int LOG_LEVEL = LOG_LEVEL_WARN;
 #endif
 
 void OutputLogHeader(const char *file, int line, const char *func, int level);
+// extern std::mutex _logger_mutex_;
+
+#define LOG(_log_level_, ...)                                               \
+  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, _log_level_);     \
+  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                \
+  fprintf(LOG_OUTPUT_STREAM, "\n");                                         \
+  ::fflush(stdout);                                                         \
+  // _logger_mutex_.unlock()
+
 
 // Two convenient macros for debugging
 // 1. Logging macros.
@@ -99,10 +109,7 @@ void OutputLogHeader(const char *file, int line, const char *func, int level);
 #define LOG_ERROR_ENABLED
 // #pragma message("LOG_ERROR was enabled.")
 #define LOG_ERROR(...)                                                      \
-  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_ERROR); \
-  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                \
-  fprintf(LOG_OUTPUT_STREAM, "\n");                                         \
-  ::fflush(stdout)
+  LOG(LOG_LEVEL_ERROR, __VA_ARGS__)
 #else
 #define LOG_ERROR(...) ((void)0)
 #endif
@@ -114,10 +121,7 @@ void OutputLogHeader(const char *file, int line, const char *func, int level);
 #define LOG_WARN_ENABLED
 // #pragma message("LOG_WARN was enabled.")
 #define LOG_WARN(...)                                                      \
-  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_WARN); \
-  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                               \
-  fprintf(LOG_OUTPUT_STREAM, "\n");                                        \
-  ::fflush(stdout)
+  LOG(LOG_LEVEL_WARN, __VA_ARGS__)
 #else
 #define LOG_WARN(...) ((void)0)
 #endif
@@ -129,10 +133,7 @@ void OutputLogHeader(const char *file, int line, const char *func, int level);
 #define LOG_INFO_ENABLED
 // #pragma message("LOG_INFO was enabled.")
 #define LOG_INFO(...)                                                      \
-  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_INFO); \
-  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                               \
-  fprintf(LOG_OUTPUT_STREAM, "\n");                                        \
-  ::fflush(stdout)
+  LOG(LOG_LEVEL_INFO, __VA_ARGS__)
 #else
 #define LOG_INFO(...) ((void)0)
 #endif
@@ -144,10 +145,7 @@ void OutputLogHeader(const char *file, int line, const char *func, int level);
 #define LOG_DEBUG_ENABLED
 // #pragma message("LOG_DEBUG was enabled.")
 #define LOG_DEBUG(...)                                                      \
-  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_DEBUG); \
-  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                \
-  fprintf(LOG_OUTPUT_STREAM, "\n");                                         \
-  ::fflush(stdout)
+  LOG(LOG_LEVEL_DEBUG, __VA_ARGS__)
 #else
 #define LOG_DEBUG(...) ((void)0)
 #endif
@@ -159,10 +157,7 @@ void OutputLogHeader(const char *file, int line, const char *func, int level);
 #define LOG_TRACE_ENABLED
 // #pragma message("LOG_TRACE was enabled.")
 #define LOG_TRACE(...)                                                      \
-  OutputLogHeader(__SHORT_FILE__, __LINE__, __FUNCTION__, LOG_LEVEL_TRACE); \
-  ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                \
-  fprintf(LOG_OUTPUT_STREAM, "\n");                                         \
-  ::fflush(stdout)
+  LOG(LOG_LEVEL_TRACE, __VA_ARGS__)
 #else
 #define LOG_TRACE(...) ((void)0)
 #endif

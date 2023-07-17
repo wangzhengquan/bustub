@@ -40,8 +40,8 @@ class IndexIterator {
   // Postfix increment
   auto operator++(int) -> IndexIterator;
 
-  auto operator==(const IndexIterator &itr) const -> bool {
-    return leaf_page_->GetPageId() == itr.leaf_page_->GetPageId() && index_ == itr.index_;
+  auto operator==(const IndexIterator &other) const -> bool {
+    return leaf_page_->GetPageId() == other.leaf_page_->GetPageId() && index_ == other.index_;
   }
 
   auto operator!=(const IndexIterator &itr) const -> bool { return !(itr == *this); }

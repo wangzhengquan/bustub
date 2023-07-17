@@ -74,7 +74,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) -> MappingType & {
-  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index ");
+  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index, index=%d, size=%d ", index, GetSize());
   return array_[index];
 }
 

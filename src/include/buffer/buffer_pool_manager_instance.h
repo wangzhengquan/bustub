@@ -52,6 +52,8 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   /** @brief Return the pointer to all the pages in the buffer pool. */
   auto GetPages() -> Page * { return pages_; }
 
+  void Print();
+
  protected:
   /**
    *
@@ -133,7 +135,9 @@ class BufferPoolManagerInstance : public BufferPoolManager {
    * @return false if the page exists but could not be deleted, true if the page didn't exist or deletion succeeded
    */
   auto DeletePgImp(page_id_t page_id) -> bool override;
-  
+
+
+
 private:
   /** Number of pages in the buffer pool. */
   const size_t pool_size_;
@@ -158,7 +162,7 @@ private:
   ReaderWriterLatch free_list_latch_;
   /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
   // std::mutex mutex_;
-  ReaderWriterLatch latch_;
+  ReaderWriterLatch pages_latch_;
   
   std::atomic<size_t> current_timestamp_{0};
   

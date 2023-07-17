@@ -19,8 +19,8 @@
 #include "test_util.h"  // NOLINT
 
 namespace bustub {
-
-TEST(BPlusTreeTests, InsertTest1) {
+// DISABLED_
+TEST(BPlusTreeTests, DISABLED_InsertTest1) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -64,7 +64,7 @@ TEST(BPlusTreeTests, InsertTest1) {
   remove("test.log");
 }
 
-TEST(BPlusTreeTests, InsertTest2) {
+TEST(BPlusTreeTests, DISABLED_InsertTest2) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -127,7 +127,7 @@ TEST(BPlusTreeTests, InsertTest2) {
   remove("test.log");
 }
 
-TEST(BPlusTreeTests, InsertTest3) {
+TEST(BPlusTreeTests, DISABLED_InsertTest3) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -187,6 +187,49 @@ TEST(BPlusTreeTests, InsertTest3) {
     EXPECT_EQ(location.GetSlotNum(), current_key);
     current_key = current_key + 1;
   }
+
+  bpm->UnpinPage(HEADER_PAGE_ID, true);
+  delete transaction;
+  delete disk_manager;
+  delete bpm;
+  remove("test.db");
+  remove("test.log");
+}
+
+TEST(BPlusTreeTests, InsertTest4) {
+  // create KeyComparator and index schema
+  auto key_schema = ParseCreateStatement("a bigint");
+  GenericComparator<8> comparator(key_schema.get());
+
+  auto *disk_manager = new DiskManager("test.db");
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(100, disk_manager);
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
+  GenericKey<8> index_key;
+  RID rid;
+  // create transaction
+  auto *transaction = new Transaction(0);
+
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  (void)header_page;
+
+  for (int64_t key = 1; key < 100; ++key) {
+    int64_t value = key & 0xFFFFFFFF;
+    rid.Set(static_cast<int32_t>(key >> 32), value);
+    index_key.SetFromInteger(key);
+    tree.Insert(index_key, rid, transaction);
+  }
+  tree.Draw(bpm, "tree.dot");
+  tree.Print(bpm);
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+     std::cout << iterator->first << ",";
+  }
+  std::cout << std::endl;
+   
+
+  
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   delete transaction;

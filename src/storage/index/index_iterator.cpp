@@ -16,7 +16,9 @@ INDEXITERATOR_TYPE::IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page, BufferP
     : leaf_page_(leaf_page), bpm_(bpm), index_(index){};
 
 INDEX_TEMPLATE_ARGUMENTS
-INDEXITERATOR_TYPE::~IndexIterator() = default;  // NOLINT
+INDEXITERATOR_TYPE::~IndexIterator(){
+  bpm_->UnpinPage(leaf_page_->GetPageId(), false);
+}
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool {
@@ -32,15 +34,21 @@ auto INDEXITERATOR_TYPE::operator->() -> const MappingType * { return &(leaf_pag
 // Prefix increment
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
-  if (index_ < leaf_page_->GetSize()) {
-    ++index_;
-  } else {
-    leaf_page_ =
-        reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(bpm_->FetchPage(leaf_page_->GetNextPageId())->GetData());
-    index_ = 0;
+  if(IsEnd()){
+    return *this;
+  }
+  ++index_;
+  if (index_ >= leaf_page_->GetSize()) {
+    page_id_t next_page_id = leaf_page_->GetNextPageId();
+    bpm_->UnpinPage(leaf_page_->GetPageId(), false);
+    if(next_page_id != INVALID_PAGE_ID){
+      leaf_page_ = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(bpm_->FetchPage(next_page_id)->GetData());
+      index_ = 0;
+    }
   }
   return *this;
 }
+
 // Postfix increment
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator++(int) -> INDEXITERATOR_TYPE {
