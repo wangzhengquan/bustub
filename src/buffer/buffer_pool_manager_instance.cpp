@@ -59,7 +59,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
     // evict
     frame_id = Evict();
     if(frame_id == -1){
- std::cout << "NewPgImp nullptr" << std::endl;   
+      LOG_WARN("no avalide frame");
       Print();
       return nullptr;
     }
@@ -71,6 +71,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
   page.is_dirty_ = true;
   page.ResetMemory();
   page.page_id_ = new_page_id;
+  page.state_ = Page::State::NORMAL;
   page.RecordAccess(++current_timestamp_);
   page_table_->Insert(new_page_id, frame_id);
 
@@ -112,7 +113,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
     // evict
     frame_id = Evict();
     if(frame_id == -1){
- std::cout << "FetchPgImp nullptr" << std::endl;      
+      LOG_WARN("no avalide frame") ;  
       Print();
       return nullptr;
     }
@@ -122,6 +123,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   page.WLatch();
   page.ResetMemory();
   page.page_id_ = page_id;
+  page.state_ = Page::State::NORMAL;
   page.RecordAccess(++current_timestamp_);
   disk_manager_->ReadPage(page_id, page.GetData());
   page.is_dirty_ = false;
@@ -133,7 +135,10 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
 
 auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> bool {
   frame_id_t frame_id;
-
+  if(page_id == INVALID_PAGE_ID) {
+    return false;
+  }
+    
   pages_latch_.RLock();
   if (!page_table_->Find(page_id, frame_id)) {
     pages_latch_.RUnlock();
@@ -142,16 +147,34 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
 
   Page &page = pages_[frame_id];
   page.WLatch();
-  pages_latch_.RUnlock();
-
-  if (page.pin_count_ <= 0) {
+  page.pin_count_--;
+  if (page.pin_count_ < 0) {
+    LOG_WARN("\n page.pin_count_ < 0 , pageid = %d, pin_count = %d", page.GetPageId(),  page.pin_count_ );
+    // BUSTUB_ASSERT(false, "page.pin_count_ < 0");
+    pages_latch_.RUnlock();
     page.WUnlatch();
     return false;
+  } else if (page.pin_count_ == 0 && page.state_ ==  Page::State::WAITTING_TO_DELETE) {
+    // remove page
+    page_table_->Remove(page_id);
+    page.Remove();
+    pages_latch_.RUnlock();
+
+    page.ResetMemory();
+    free_list_latch_.WLock();
+    free_list_.push_back(frame_id);
+    free_list_latch_.WUnlock();
+    DeallocatePage(page_id);
+    page.WUnlatch();
+  } else {
+    pages_latch_.RUnlock();
+
+    if(is_dirty){
+      page.is_dirty_ = is_dirty;
+    }
+    page.WUnlatch();
   }
-  page.pin_count_--;
-  if(is_dirty)
-    page.is_dirty_ = is_dirty;
-  page.WUnlatch();
+  
   return true;
 }
 
@@ -202,7 +225,8 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   Page &page = pages_[frame_id];
   page.WLatch();
   if (!page.Evictable() ) {
-    std::cout << "Delete false:" << std::endl;
+    page.state_ = Page::State::WAITTING_TO_DELETE;
+    // LOG_WARN("Delete a currently active page %d", page.page_id_);
     page.WUnlatch();
     pages_latch_.WUnlock();
     return false;
@@ -212,7 +236,6 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   pages_latch_.WUnlock();
   
   page.ResetMemory();
-  page.is_dirty_ = false;
   free_list_latch_.WLock();
   free_list_.push_back(frame_id);
   free_list_latch_.WUnlock();

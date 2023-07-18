@@ -50,7 +50,9 @@ class BufferPoolManagerInstance : public BufferPoolManager {
   auto GetPoolSize() -> size_t override { return pool_size_; }
 
   /** @brief Return the pointer to all the pages in the buffer pool. */
-  auto GetPages() -> Page * { return pages_; }
+  auto GetFrames() -> Page * { return pages_; }
+
+ // ==================== for test ================
 
   void Print();
 

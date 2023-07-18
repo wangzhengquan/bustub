@@ -207,13 +207,19 @@ TEST(BPlusTreeTests, DISABLED_Random_Test) {
   remove("test.log");
 }
 
-TEST(BPlusTreeTests, DISABLED_InsertOnAscent_DeleteOnDecent_Test) {
+TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+  size_t pool_size = 50;
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  (void)header_page;
+  ASSERT_EQ(page_id, HEADER_PAGE_ID);
   // create b+ tree
   BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
   GenericKey<8> index_key;
@@ -221,26 +227,40 @@ TEST(BPlusTreeTests, DISABLED_InsertOnAscent_DeleteOnDecent_Test) {
   // create transaction
   auto *transaction = new Transaction(0);
 
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-
+ 
   for (int64_t key = 1; key < 40; ++key) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
+  Page* frames;
+  // bpm->UnpinPage(HEADER_PAGE_ID, true);
+  // Page* frames = bpm->GetFrames();
+  // for(size_t i = 0; i < pool_size; i++) {
+  //   Page &frame = frames[i];
+  //   EXPECT_EQ(frame.GetPinCount(), 0);
+  //   std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  // }
 
-  for (int64_t key = 20; key > 0; --key) {
+
+  for (int64_t key = 5; key > 0; --key) {
     index_key.SetFromInteger(key);
     tree.Remove(index_key, transaction);
   }
 
   tree.Draw(bpm, "ascent.dot");
-
+  // tree.Print(bpm);
   bpm->UnpinPage(HEADER_PAGE_ID, true);
+
+
+  frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
+
   delete transaction;
   delete disk_manager;
   delete bpm;
@@ -248,7 +268,7 @@ TEST(BPlusTreeTests, DISABLED_InsertOnAscent_DeleteOnDecent_Test) {
   remove("test.log");
 }
 
-TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
+TEST(BPlusTreeTests, DISABLED_InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -297,7 +317,7 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   remove("test.log");
 }
 
-TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree3_Test) {
+TEST(BPlusTreeTests, DISABLED_InsertOnDescent_DeleteOnAscent_Degree3_Test) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());

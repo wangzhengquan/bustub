@@ -30,8 +30,10 @@ class Page {
   // There is book-keeping information inside the page that should only be relevant to the buffer pool manager.
   friend class BufferPoolManagerInstance;
   friend class LRUKReplacer;
+ 
 
  public:
+  enum class State{NORMAL=0, WAITTING_TO_DELETE, DELETED};
   /** Constructor. Zeros out the page data. */
   Page() { ResetMemory(); }
 
@@ -96,6 +98,10 @@ class Page {
   ReaderWriterLatch rwlatch_;
 
 // for lru_k
+  std::list<size_t> access_histories_{};
+  size_t k_;
+  State state_ = State::NORMAL;
+
 public:
   void RecordAccess(size_t timestamp) {
     pin_count_++;
@@ -107,7 +113,7 @@ public:
 
   //void SetEvictable(bool evictable) { evictable_ = evictable; }
 
-  auto Evictable() -> bool { return pin_count_ == 0; }
+  auto Evictable() -> bool { return pin_count_ <= 0; }
 
   // auto AccessHistories() -> std::list<size_t> { return access_histories_; }
 
@@ -121,7 +127,7 @@ public:
     return current_timestamp - access_histories_.front();
   }
   
-  // void ClearHistory(){
+  // void ClearAccessHistory(){
   //   access_histories_.clear();
   // }
   void SetK(size_t k){
@@ -129,6 +135,7 @@ public:
   }
 
   auto Removed() -> bool{
+    // state==State::DELETED;
     return page_id_ == INVALID_PAGE_ID;;
   }
 
@@ -139,11 +146,11 @@ public:
     page_id_ = INVALID_PAGE_ID;
     pin_count_ = 0;
     access_histories_.clear();
+    state_ = State::DELETED;
     return true;
   }
   
-  std::list<size_t> access_histories_{};
-  size_t k_;
+  
 };
 
 }  // namespace bustub

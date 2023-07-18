@@ -74,13 +74,13 @@ class BPlusTreeLeafPage : public BPlusTreePage {
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) -> MappingType & {
-  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index, index=%d, size=%d ", index, GetSize());
+  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index, page_id=%d, index=%d, size=%d ", page_id_, index, GetSize());
   return array_[index];
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::At(int index) const -> const MappingType & {
-  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index ");
+  BUSTUB_ASSERT(index >= 0 && index < GetSize(), "invalid index, page_id=%d, index=%d, size=%d ", page_id_, index, GetSize());
   return array_[index];
 }
 

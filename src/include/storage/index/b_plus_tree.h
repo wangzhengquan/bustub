@@ -119,7 +119,7 @@ class BPlusTree {
   int leaf_max_size_;
   int internal_max_size_;
   page_id_t root_page_id_ = INVALID_PAGE_ID;
-  // 
+  // It is employed as a lock instead of using it as a real page.
   BPlusTreePage * new_root_latch_;
   // BPlusTreePage* root_page_ = nullptr;
 };

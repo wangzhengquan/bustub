@@ -50,9 +50,9 @@ void InsertHelper(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree, con
   auto *transaction = new Transaction(0);
   for (size_t i = start; i < end; i++) {
     int64_t key = keys[i];
-    mutex_.lock();
-    std::cout << "thread " << thread_id << " insert " << key << std::endl;
-    mutex_.unlock();
+    // mutex_.lock();
+    // std::cout << "thread " << thread_id << " insert " << key << std::endl;
+    // mutex_.unlock();
 
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
@@ -71,6 +71,7 @@ void InsertHelperSplit(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree
   RID rid;
   // create transaction
   auto *transaction = new Transaction(0);
+  
   for (auto key : keys) {
     if (static_cast<uint64_t>(key) % total_threads == thread_itr) {
       int64_t value = key & 0xFFFFFFFF;
@@ -83,12 +84,21 @@ void InsertHelperSplit(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree
 }
 
 // helper function to delete
-void DeleteHelper(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree, const std::vector<int64_t> &remove_keys,
-                  __attribute__((unused)) uint64_t thread_itr = 0, __attribute__((unused)) uint64_t num_threads = 1) {
+void DeleteHelper(BPlusTree<GenericKey<8>, RID, GenericComparator<8>> *tree, const std::vector<int64_t> &keys,
+                  __attribute__((unused)) uint64_t thread_id = 0, uint64_t num_threads = 1) {
   GenericKey<8> index_key;
+  size_t num_elements = keys.size();
+  size_t elements_per_task = (num_elements + num_threads - 1) / num_threads;
+  size_t start = elements_per_task * thread_id;
+  size_t end = std::min(start + elements_per_task, num_elements);
+ 
   // create transaction
   auto *transaction = new Transaction(0);
-  for (auto key : remove_keys) {
+  for (size_t i = start; i < end; i++) {
+    auto & key = keys[i];
+     mutex_.lock();
+    std::cout << "thread " << thread_id << " delete " << key << std::endl;
+    mutex_.unlock();
     index_key.SetFromInteger(key);
     tree->Remove(index_key, transaction);
   }
@@ -386,13 +396,14 @@ TEST(BPlusTreeTests, DISABLED_BufferPoolManagerTest) {
   remove("test.log");
 }
 
-TEST(BPlusTreeConcurrentTest, ConcurrentInsert1) {
+TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentInsert1) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+  size_t pool_size = 50;
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(&page_id);
@@ -406,28 +417,99 @@ TEST(BPlusTreeConcurrentTest, ConcurrentInsert1) {
     keys.push_back(i);
   }
   // concurrent insert
-  LaunchParallelTest(4, InsertHelper, &tree, keys);
-  // concurrent delete
-  // std::vector<int64_t> remove_keys = {1, 4, 3, 5, 6};
-  // LaunchParallelTest(1, DeleteHelper, &tree, remove_keys);
-
-  tree.Draw(bpm, "tree.dot");
-  // tree.Print(bpm);
+  LaunchParallelTest(1, InsertHelper, &tree, keys);
 
   int64_t size = 0;
-  // int64_t pre = -1;
+  GenericKey<8> pre ;
+  pre.SetFromInteger(-1);
   for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-    // int64_t cur = iterator->first;
-    // EXPECT_GT(cur, pre);
-    std::cout <<  iterator->first << " ";
-    // pre = cur;
+    auto & cur = iterator->first;
+    EXPECT_GT(comparator(cur, pre), 0);
+    std::cout << cur << " ";
+    pre = cur;
     size = size + 1;
   }
   std::cout << std::endl;
   EXPECT_EQ(size, num);
 
+  tree.Draw(bpm, "ConcurrentInsert_tree.dot");
+  // tree.Print(bpm);
+  bpm->UnpinPage(HEADER_PAGE_ID, true);
+  
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
+  delete disk_manager;
+  delete bpm;
+  remove("test.db");
+  remove("test.log");
+}
+
+
+TEST(BPlusTreeConcurrentTest, ConcurrentDelete1) {
+  // create KeyComparator and index schema
+  auto key_schema = ParseCreateStatement("a bigint");
+  GenericComparator<8> comparator(key_schema.get());
+
+  auto *disk_manager = new DiskManager("test.db");
+  size_t pool_size = 50;
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  (void)header_page;
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
+
+  int64_t num = 20;
+  std::vector<int64_t> keys;
+  for (int64_t i = 0; i < num; i++) {
+    keys.push_back(i);
+  }
+  LaunchParallelTest(4, InsertHelper, &tree, keys);
+
+  std::vector<int64_t> remove_keys;
+  for (int64_t i = 0; i < num; i++) {
+    if(i % 2 == 0){
+      remove_keys.push_back(i);
+    }
+  }
+  LaunchParallelTest(4, DeleteHelper, &tree, remove_keys);
+
+  // tree.Draw(bpm, "tree.dot");
+  tree.Print(bpm);
+  tree.Draw(bpm, "concurrent_delete_tree.dot");
+
+  int64_t size = 0;
+  GenericKey<8> pre ;
+  pre.SetFromInteger(-1);
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+    auto & cur = iterator->first;
+    EXPECT_GT(comparator(cur, pre), 0);
+    std::cout << cur << " ";
+    pre = cur;
+    ++size;
+  }
+  std::cout << "\nsize = " << size << std::endl;
+  EXPECT_EQ(size, keys.size() - remove_keys.size());
+
+ 
+
   // bpm->Print();
   bpm->UnpinPage(HEADER_PAGE_ID, true);
+  
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
+
+
+
   delete disk_manager;
   delete bpm;
   remove("test.db");

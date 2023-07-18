@@ -34,19 +34,17 @@ auto INDEXITERATOR_TYPE::operator->() -> const MappingType * { return &(leaf_pag
 // Prefix increment
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::operator++() -> INDEXITERATOR_TYPE & {
+  ++index_;
   if(IsEnd()){
     return *this;
-  }
-  ++index_;
-  if (index_ >= leaf_page_->GetSize()) {
+  } else if (index_ >= leaf_page_->GetSize()) {
     page_id_t next_page_id = leaf_page_->GetNextPageId();
     bpm_->UnpinPage(leaf_page_->GetPageId(), false);
-    if(next_page_id != INVALID_PAGE_ID){
-      leaf_page_ = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(bpm_->FetchPage(next_page_id)->GetData());
-      index_ = 0;
-    }
+    leaf_page_ = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(bpm_->FetchPage(next_page_id)->GetData());
+    index_ = 0;
   }
   return *this;
+  
 }
 
 // Postfix increment

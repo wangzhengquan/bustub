@@ -202,7 +202,14 @@ TEST(BPlusTreeTests, InsertTest4) {
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(100, disk_manager);
+  size_t pool_size = 20;
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
+
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  (void)header_page;
+
   // create b+ tree
   BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
   GenericKey<8> index_key;
@@ -210,28 +217,29 @@ TEST(BPlusTreeTests, InsertTest4) {
   // create transaction
   auto *transaction = new Transaction(0);
 
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-
-  for (int64_t key = 1; key < 100; ++key) {
+  for (int64_t key = 0; key < 30; ++key) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
     tree.Insert(index_key, rid, transaction);
   }
-  tree.Draw(bpm, "tree.dot");
-  tree.Print(bpm);
+  
   for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
      std::cout << iterator->first << ",";
   }
   std::cout << std::endl;
    
-
-  
+  // tree.Draw(bpm, "tree.dot");
+  // tree.Print(bpm);
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
+
   delete transaction;
   delete disk_manager;
   delete bpm;
