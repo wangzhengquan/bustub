@@ -100,8 +100,8 @@ class BPlusTree {
   /**
    * Remove the node at index in LeafPage
    */
-  void RemoveAtInLeafPage(LeafPage *page, int index, const KeyType &key);
-  void RemoveAtInInternalPage(InternalPage *page, int index, const KeyType &key);
+  void RemoveInLeafPage(LeafPage *page, int index, const KeyType &key);
+  void RemoveInInternalPage(InternalPage *page, int index, const KeyType &key);
   /**
    * Change the parent id of all child nodes under this node to this node's id.
    * */
