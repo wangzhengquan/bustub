@@ -83,6 +83,7 @@ auto BufferPoolManagerInstance::NewPgImp(page_id_t *page_id) -> Page * {
 }
 
 /**
+ * 需要考虑的情况
  * 1. 同时evict
  * 2. evict and cache hit ocurce simultaneously.
 */
