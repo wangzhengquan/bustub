@@ -396,7 +396,7 @@ TEST(BPlusTreeTests, DISABLED_BufferPoolManagerTest) {
   remove("test.log");
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentInsert1) {
+TEST(BPlusTreeConcurrentTest, ConcurrentInsert1) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -417,8 +417,9 @@ TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentInsert1) {
     keys.push_back(i);
   }
   // concurrent insert
-  LaunchParallelTest(1, InsertHelper, &tree, keys);
+  LaunchParallelTest(4, InsertHelper, &tree, keys);
 
+  EXPECT_EQ(tree.Check(), true);
   int64_t size = 0;
   GenericKey<8> pre ;
   pre.SetFromInteger(-1);
@@ -432,7 +433,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentInsert1) {
   std::cout << std::endl;
   EXPECT_EQ(size, num);
 
-  tree.Draw(bpm, "ConcurrentInsert_tree.dot");
+  tree.Draw(bpm, "tree-ConcurrentInsert.dot");
   // tree.Print(bpm);
   bpm->UnpinPage(HEADER_PAGE_ID, true);
   
@@ -449,7 +450,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentInsert1) {
 }
 
 
-TEST(BPlusTreeConcurrentTest, ConcurrentDelete1) {
+TEST(BPlusTreeConcurrentTest, ConcurrentDelete) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -479,9 +480,9 @@ TEST(BPlusTreeConcurrentTest, ConcurrentDelete1) {
   }
   LaunchParallelTest(4, DeleteHelper, &tree, remove_keys);
 
-  // tree.Draw(bpm, "tree.dot");
-  tree.Print(bpm);
-  tree.Draw(bpm, "concurrent_delete_tree.dot");
+  EXPECT_EQ(tree.Check(), true);
+  // tree.Print(bpm);
+  tree.Draw(bpm, "tree-concurrent-delete.dot");
 
   int64_t size = 0;
   GenericKey<8> pre ;
