@@ -58,7 +58,7 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> int;
   void InsertAt(const KeyType &key, const ValueType &value, int i);
   void Append(const KeyType &key, const ValueType &value);
-  void Coalesce(BPlusTreeInternalPage *other, const KeyComparator &comparator);
+  void Coalesce(BPlusTreeInternalPage *other, const KeyComparator &comparator, const bool to_right);
   void RemoveAt(int i);
 
  private:

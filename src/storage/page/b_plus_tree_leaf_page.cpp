@@ -124,16 +124,32 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Append(const KeyType &key, const ValueType &val
   ++size_;
 }
 
+// INDEX_TEMPLATE_ARGUMENTS
+// void B_PLUS_TREE_LEAF_PAGE_TYPE::Coalesce(B_PLUS_TREE_LEAF_PAGE_TYPE *other, const KeyComparator &comparator) {
+//   int other_size = other->GetSize();
+//   if (other_size == 0) return;
+//   BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range");
+//   if (size_ == 0) {
+//     std::copy(&other->array_[0], &other->array_[other_size], &array_[0]);
+//   } else if (comparator(other->KeyAt(0), KeyAt(size_ - 1)) > 0) {
+//     std::copy(&other->array_[0], &other->array_[other_size], &array_[size_]);
+//   } else if (comparator(other->KeyAt(other_size - 1), KeyAt(0)) < 0) {
+//     std::copy(&array_[0], &array_[size_], &other->array_[other_size]);
+//     std::copy(&other->array_[0], &other->array_[size_ + other_size], &array_[0]);
+//   }
+//   size_ += other_size;
+// }
+
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::Coalesce(B_PLUS_TREE_LEAF_PAGE_TYPE *other, const KeyComparator &comparator) {
+void B_PLUS_TREE_LEAF_PAGE_TYPE::Coalesce(B_PLUS_TREE_LEAF_PAGE_TYPE *other, const KeyComparator &comparator, const bool to_right) {
   int other_size = other->GetSize();
   if (other_size == 0) return;
-  BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range");
-  if (size_ == 0) {
-    std::copy(&other->array_[0], &other->array_[other_size], &array_[0]);
-  } else if (comparator(other->KeyAt(0), KeyAt(size_ - 1)) > 0) {
+  BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Coalesce out of range");
+  if(to_right){
+    BUSTUB_ASSERT(comparator(other->KeyAt(0), KeyAt(size_ - 1)) > 0, "Coalesce to right, violate the rule that the first key in the right need to be larger than the lask key in the left");
     std::copy(&other->array_[0], &other->array_[other_size], &array_[size_]);
-  } else if (comparator(other->KeyAt(other_size - 1), KeyAt(0)) < 0) {
+  } else {
+    BUSTUB_ASSERT(comparator(other->KeyAt(other_size - 1), KeyAt(0)) < 0, "Coalesce to left, violate the rule that the last key in the left need to be smaller than the first one in the right");
     std::copy(&array_[0], &array_[size_], &other->array_[other_size]);
     std::copy(&other->array_[0], &other->array_[size_ + other_size], &array_[0]);
   }

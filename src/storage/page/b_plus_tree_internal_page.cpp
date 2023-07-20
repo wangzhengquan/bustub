@@ -73,8 +73,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetValueAt(int index, const ValueType &valu
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int {
   int i;
-  // Note that the compare operation will stop when 'i=1', that is because the key at position 0 in an internal node is
-  // a virtual key that conceptually represents the minimum key of the node.
+  
   for (i = GetSize() - 1; i > 0 && comparator(key, array_[i].first) == -1; i--)
     ;
   return i;
@@ -89,14 +88,8 @@ INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator)
     -> int {
   int i;
-  /**
-   * Here, the stop condition is 'i > 1' instead of 'i > 0' because the key at position 0 in an internal node is a
-   * virtual key that conceptually represents the minimum key of the node. However, it may not necessarily have the
-   * minimum or even an actual value associated with it. To treat the virtual key as the minimum one, when iterating
-   * over the keys in the node, we start from maximum position and continue until 'i > 1'. Therefore, unless the
-   * 'array_' is empty, the insert index 'i' will always be greater than 0.
-   */
-  for (i = GetSize(); i > 1 && comparator(key, array_[i - 1].first) == -1; i--)
+ 
+  for (i = GetSize(); i > 0 && comparator(key, array_[i - 1].first) == -1; i--)
     ;
   InsertAt(key, value, i);
   return i;
@@ -121,16 +114,32 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Append(const KeyType &key, const ValueType 
   ++size_;
 }
 
+// INDEX_TEMPLATE_ARGUMENTS
+// void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(B_PLUS_TREE_INTERNAL_PAGE_TYPE *other, const KeyComparator &comparator) {
+//   int other_size = other->GetSize();
+//   if (other_size == 0) return;
+//   BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range");
+//   if (size_ == 0) {
+//     std::copy(&other->array_[0], &other->array_[other_size], &array_[0]);
+//   } else if (comparator(other->KeyAt(0), KeyAt(size_ - 1)) > 0) {
+//     std::copy(&other->array_[0], &other->array_[other_size], &array_[size_]);
+//   } else if (comparator(other->KeyAt(other_size - 1), KeyAt(0)) < 0) {
+//     std::copy(&array_[0], &array_[size_], &other->array_[other_size]);
+//     std::copy(&other->array_[0], &other->array_[size_ + other_size], &array_[0]);
+//   }
+//   size_ += other_size;
+// }
+
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(B_PLUS_TREE_INTERNAL_PAGE_TYPE *other, const KeyComparator &comparator) {
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Coalesce(B_PLUS_TREE_INTERNAL_PAGE_TYPE *other, const KeyComparator &comparator, const bool to_right) {
   int other_size = other->GetSize();
   if (other_size == 0) return;
-  BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Insert out of range");
-  if (size_ == 0) {
-    std::copy(&other->array_[0], &other->array_[other_size], &array_[0]);
-  } else if (comparator(other->KeyAt(0), KeyAt(size_ - 1)) > 0) {
+  BUSTUB_ASSERT(size_ + other_size < GetMaxSize(), "Coalesce out of range");
+  if(to_right){
+    BUSTUB_ASSERT(comparator(other->KeyAt(0), KeyAt(size_ - 1)) > 0, "Coalesce to right, violate the rule that the first key in the right need to be larger than the lask key in the left");
     std::copy(&other->array_[0], &other->array_[other_size], &array_[size_]);
-  } else if (comparator(other->KeyAt(other_size - 1), KeyAt(0)) < 0) {
+  } else {
+    BUSTUB_ASSERT(comparator(other->KeyAt(other_size - 1), KeyAt(0)) < 0, "Coalesce to left, violate the rule that the last key in the left need to be smaller than the first one in the right");
     std::copy(&array_[0], &array_[size_], &other->array_[other_size]);
     std::copy(&other->array_[0], &other->array_[size_ + other_size], &array_[0]);
   }

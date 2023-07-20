@@ -54,7 +54,7 @@ class BPlusTree {
   auto Insert(const KeyType &key, const ValueType &value, Transaction *transaction = nullptr) -> bool;
 
   // Remove a key and its value from this B+ tree.
-  void Remove(const KeyType &key, Transaction *transaction = nullptr);
+  auto Remove(const KeyType &key, Transaction *transaction = nullptr) -> bool;
 
   // return the value associated with a given key
   auto GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction = nullptr) -> bool;
@@ -73,7 +73,7 @@ class BPlusTree {
   // draw the B+ tree
   void Draw(BufferPoolManager *bpm, const std::string &outf);
 
-  void Check() const ;
+  auto Check() const -> bool ;
 
   // read data from file and insert one by one
   void InsertFromFile(const std::string &file_name, Transaction *transaction = nullptr);
@@ -85,7 +85,7 @@ class BPlusTree {
   void UpdateRootPageId(int insert_record = 0);
   void UnlockPageList(std::list<BPlusTreePage *> *locked_list, bool dirty, const Operation op);
   void PrintLockedPageList(std::list<BPlusTreePage *> *locked_list);
-  void Check_(BPlusTreePage *page) const ;
+  auto Check_(BPlusTreePage *page) const -> bool ;
   /**
    * @insert find for insert
    */
@@ -108,7 +108,9 @@ class BPlusTree {
   /**
    * Change the parent id of all child nodes under this node to this node's id.
    * */
-  void ChangeParentOfChildrenIn(InternalPage *page);
+  // void SetParentOfChildren(InternalPage *page);
+  void SetParentOfChildrenInPageTo(InternalPage *page, page_id_t parent_page_id);
+  void SetParentOfPageTo(page_id_t page_id, page_id_t parent_page_id) ;
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
