@@ -24,19 +24,26 @@ namespace fs = std::filesystem;
 
 namespace bustub {
 //DISABLED_
-TEST(BPlusTreeTests, DISABLED_DeleteTest1) {
+TEST(BPlusTreeTests, DeleteTest1) {
   // create KeyComparator and index schema
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
+  
+
   BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
-   // create and fetch header_page
+
+  // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
+   
   // create b+ tree
   BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator);
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+    std::cout << iterator->first << " ";
+  }
   GenericKey<8> index_key;
   RID rid;
   // create transaction
@@ -96,6 +103,7 @@ TEST(BPlusTreeTests, DISABLED_DeleteTest1) {
   remove("test.db");
   remove("test.log");
 }
+
 // DISABLED_
 TEST(BPlusTreeTests, DISABLED_DeleteTest2) {
   // create KeyComparator and index schema
@@ -193,11 +201,14 @@ TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
   auto *transaction = new Transaction(0);
 
   int64_t num_keys = 100;
-  for (int64_t key = 0; key < num_keys; ++key) {
+  for (int64_t key = 0; key <= num_keys; ++key) {
+
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
-    tree.Insert(index_key, rid, transaction);
+    bool suc = tree.Insert(index_key, rid, transaction);
+    // std::cout << "----insert------" << key << std::endl;
+    ASSERT_EQ(suc, true);
   }
   Page* frames;
   // bpm->UnpinPage(HEADER_PAGE_ID, true);
@@ -208,10 +219,12 @@ TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
   //   std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
   // }
 
-  int64_t num_remove_keys = 50;
-  for (int64_t key = num_remove_keys; key > 0; --key) {
+  int64_t num_remove_keys = 100;
+  for (int64_t key = num_remove_keys; key >= 0; --key) {
     index_key.SetFromInteger(key);
-    tree.Remove(index_key, transaction);
+    bool suc = tree.Remove(index_key, transaction);
+    // std::cout << "----remove------" << key << std::endl;
+    ASSERT_EQ(suc, true);
   }
 
   tree.Draw(bpm, "ascent.dot");
@@ -247,6 +260,7 @@ TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
   delete bpm;
   remove("test.db");
   remove("test.log");
+
 }
  
 
@@ -273,21 +287,24 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   fs::remove_all("output1-1");
   fs::create_directory("output1-1");
  
-  int64_t num_keys = 40;
-  for (int64_t key = num_keys; key > 0; key--) {
-    std::cout << "insert " << key << std::endl;
+  std::vector<int64_t> keys;
+  for (int64_t key = 40; key > 0; key--) {
+   
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
-    tree.Insert(index_key, rid, transaction);
-    std::ostringstream out;
-    out << "output1-1/tree " << key << ".dot";
-    tree.Draw(bpm, out.str());
-    tree.Print(bpm);
-    if(!(tree.Check())){
-      std::cout << "check failed " << key << std::endl;
-      break;
+    bool suc = tree.Insert(index_key, rid, transaction);
+    ASSERT_EQ(suc, true);
+    if(suc) {
+      // std::cout << " ---- insert ----" << key << std::endl;
+      keys.push_back(key);
+      std::ostringstream out;
+      // out << "output1-1/tree " << key << ".dot";
+      // tree.Draw(bpm, out.str());
+      // tree.Print(bpm);
+      ASSERT_EQ(tree.Check(), true) ;
     }
+    
   }
 
   
@@ -295,17 +312,21 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   fs::remove_all("output1-2");
   fs::create_directory("output1-2");
   tree.Draw(bpm, "output1-2/tree.dot");
+  std::vector<int64_t> keys_removed;
  
-  int64_t num_remove_keys = 20;
-  for (int64_t key = 1; key <= num_remove_keys; ++key) {
-    std::cout << "----remove------" << key << std::endl;
+  for (int64_t key = 1; key <= 20; ++key) {
+    
     index_key.SetFromInteger(key);
-    tree.Remove(index_key, transaction);
-    std::ostringstream out;
-    out << "output1-2/tree " << key << ".dot";
-    // tree.Draw(bpm, out.str());
-    ASSERT_EQ(tree.Check(), true);
-     
+    bool suc = tree.Remove(index_key, transaction);
+    ASSERT_EQ(suc, true);
+    if(suc){
+      // std::cout << "----remove------" << key << std::endl;
+      keys_removed.push_back(key);
+      std::ostringstream out;
+      // out << "output1-2/tree " << key << ".dot";
+      // tree.Draw(bpm, out.str());
+      ASSERT_EQ(tree.Check(), true);
+    }
   }
 
   // for (int64_t key = 1; key < 20; ++key) {
@@ -314,6 +335,8 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   //   index_key.SetFromInteger(key);
   //   tree.Insert(index_key, rid, transaction);
   // }
+
+  tree.Draw(bpm, "tree-descent.dot");
 
   int64_t size = 0;
   GenericKey<8> pre ;
@@ -326,7 +349,7 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
     ++size;
   }
   std::cout << "\nsize = " << size << std::endl;
-  EXPECT_EQ(size, num_keys - num_remove_keys);
+  EXPECT_EQ(size, keys.size() - keys_removed.size());
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
 
@@ -371,7 +394,7 @@ TEST(BPlusTreeTests, DeleteInterleave_Test) {
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
     index_key.SetFromInteger(key);
-    tree.Insert(index_key, rid, transaction);
+    ASSERT_EQ(tree.Insert(index_key, rid, transaction), true);
   }
 
   fs::remove_all("output2-2");
@@ -380,24 +403,23 @@ TEST(BPlusTreeTests, DeleteInterleave_Test) {
   std::ostringstream out;
   out << "output/tree" << ".dot";
   tree.Draw(bpm, out.str());
-  int64_t num_remove_keys = 0;
-  
 
+  int64_t num_remove_keys = 0;
   for (int64_t key = 0; key < num_keys; ++key) {
     if(key % 2 == 0 ){
-      std::cout << "---remove--- " << key << std::endl;
       index_key.SetFromInteger(key);
-      tree.Remove(index_key, transaction);
+      ASSERT_EQ(tree.Remove(index_key, transaction), true);
+      // std::cout << "---remove--- " << key << std::endl;
       ++num_remove_keys;
       std::ostringstream out;
-      out << "output2-2/tree " << key << ".dot";
-      tree.Draw(bpm, out.str());
+      // out << "output2-2/tree " << key << ".dot";
+      // tree.Draw(bpm, out.str());
       ASSERT_EQ(tree.Check(), true);
        
     }
   }
 
-  // tree.Draw(bpm, "DeleteInterleave.dot");
+  tree.Draw(bpm, "tree-DeleteInterleaved.dot");
   // tree.Print(bpm);
   // tree.Check();
 
@@ -445,7 +467,7 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
   // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
   GenericKey<8> index_key;
   RID rid;
   // create transaction
@@ -467,9 +489,10 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   std::vector<int> keys_removed;
   for (int i = 0; i< num_keys; i++) {
     int key = std::rand() % num_keys;
-    std::cout << "---remove--- " << key << std::endl;
+    
     index_key.SetFromInteger(key);
     if(tree.Remove(index_key, transaction)){
+      std::cout << "---remove--- " << key << std::endl;
       keys_removed.push_back(key);
     }
   }

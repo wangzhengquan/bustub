@@ -17,11 +17,16 @@ INDEXITERATOR_TYPE::IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page, BufferP
 
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE::~IndexIterator(){
-  bpm_->UnpinPage(leaf_page_->GetPageId(), false);
+  if(leaf_page_ != nullptr ){
+    bpm_->UnpinPage(leaf_page_->GetPageId(), false);
+  }
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool {
+  if(leaf_page_ == nullptr ){
+    return true;
+  }
   return leaf_page_->GetNextPageId() == INVALID_PAGE_ID && index_ >= leaf_page_->GetSize();
 }
 

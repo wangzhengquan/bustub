@@ -28,7 +28,7 @@ class IndexIterator {
   // using pointer           = MappingType*;
   // using reference         = MappingType&;
   // you may define your own constructor based on your member variables
-  IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page, BufferPoolManager *bpm, int index = 0);
+  IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page=nullptr, BufferPoolManager *bpm=nullptr, int index = 0);
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
@@ -41,6 +41,10 @@ class IndexIterator {
   auto operator++(int) -> IndexIterator;
 
   auto operator==(const IndexIterator &other) const -> bool {
+    if(leaf_page_ == nullptr || other.leaf_page_ == nullptr){
+       
+      return leaf_page_ == other.leaf_page_ ;
+    }
     return leaf_page_->GetPageId() == other.leaf_page_->GetPageId() && index_ == other.index_;
   }
 
