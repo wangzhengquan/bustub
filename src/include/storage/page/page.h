@@ -127,9 +127,10 @@ public:
     return current_timestamp - access_histories_.front();
   }
   
-  // void ClearAccessHistory(){
-  //   access_histories_.clear();
-  // }
+  void ClearAccessHistory(){
+    access_histories_.clear();
+  }
+
   void SetK(size_t k){
     k_ = k;
   }
@@ -144,8 +145,6 @@ public:
       return true;
     BUSTUB_ASSERT(Evictable(), "Remove a Un Evictable frame.");
     page_id_ = INVALID_PAGE_ID;
-    pin_count_ = 0;
-    access_histories_.clear();
     state_ = State::DELETED;
     return true;
   }

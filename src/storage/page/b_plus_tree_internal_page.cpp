@@ -91,20 +91,30 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Insert(const KeyType &key, const ValueType 
  
   for (i = GetSize(); i > 0 && comparator(key, array_[i - 1].first) == -1; i--)
     ;
-  InsertAt(key, value, i);
+  InsertAt({key, value}, i);
   return i;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAt(const KeyType &key, const ValueType &value, int i) {
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAt(const MappingType &pair, int i) {
   BUSTUB_ASSERT(size_ < GetMaxSize(), "Insert out of range");
   for (int j = size_; j > i; j--) {
     array_[j] = array_[j - 1];
   }
-  array_[i].first = key;
-  array_[i].second = value;
+  array_[i] = pair;
   ++size_;
 }
+
+// INDEX_TEMPLATE_ARGUMENTS
+// void B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertAt(const KeyType &key, const ValueType &value, int i) {
+//   BUSTUB_ASSERT(size_ < GetMaxSize(), "Insert out of range");
+//   for (int j = size_; j > i; j--) {
+//     array_[j] = array_[j - 1];
+//   }
+//   array_[i].first = key;
+//   array_[i].second = value;
+//   ++size_;
+// }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Append(const KeyType &key, const ValueType &value) {

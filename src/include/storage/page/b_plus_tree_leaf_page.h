@@ -61,7 +61,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
    */
   auto Insert(const MappingType &pair, const KeyComparator &comparator) -> int;
   auto Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) -> int;
-  void InsertAt(const KeyType &key, const ValueType &value, int i);
+  void InsertAt(const MappingType &pair, int i);
   void Append(const KeyType &key, const ValueType &value);
   void Coalesce(BPlusTreeLeafPage *other, const KeyComparator &comparator, const bool to_right);
   void RemoveAt(int i);

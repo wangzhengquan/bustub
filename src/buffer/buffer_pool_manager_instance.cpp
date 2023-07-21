@@ -29,18 +29,11 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManag
     free_list_.emplace_back(static_cast<int>(i));
   }
 
-  std::cout << "free_list_ front = " << free_list_.front() << std::endl;
-
-  // TODO(students): remove this line after you have implemented the buffer pool manager
-  // throw NotImplementedException(
-  //     "BufferPoolManager is not implemented yet. If you have finished implementing BPM, please remove the throw "
-  //     "exception line in `buffer_pool_manager_instance.cpp`.");
 }
 
 BufferPoolManagerInstance::~BufferPoolManagerInstance() {
   delete[] pages_;
   delete page_table_;
-  // delete replacer_;
 }
 
 
@@ -161,6 +154,8 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
     page.Remove();
     pages_latch_.RUnlock();
 
+    page.pin_count_ = 0;
+    page.ClearAccessHistory();
     page.ResetMemory();
     free_list_latch_.WLock();
     free_list_.push_back(frame_id);
@@ -236,6 +231,8 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   page.Remove();
   pages_latch_.WUnlock();
   
+  page.pin_count_ = 0;
+  page.ClearAccessHistory();
   page.ResetMemory();
   free_list_latch_.WLock();
   free_list_.push_back(frame_id);
@@ -255,15 +252,17 @@ auto BufferPoolManagerInstance::Evict() -> frame_id_t{
     pages_latch_.WUnlock();
     return -1;
   }
-  Page &old_page = pages_[frame_id];
-  old_page.WLatch();
-  if (old_page.IsDirty()) {
-    disk_manager_->WritePage(old_page.GetPageId(), old_page.GetData());
-    old_page.is_dirty_ = false;
+  Page &page = pages_[frame_id];
+  page.WLatch();
+  if (page.IsDirty()) {
+    disk_manager_->WritePage(page.GetPageId(), page.GetData());
+    page.is_dirty_ = false;
   }
-  page_table_->Remove(old_page.page_id_);
-  old_page.Remove();
-  old_page.WUnlatch();
+  page_table_->Remove(page.page_id_);
+  page.Remove();
+  page.pin_count_ = 0;
+  page.ClearAccessHistory();
+  page.WUnlatch();
   pages_latch_.WUnlock();
   return frame_id;
 }

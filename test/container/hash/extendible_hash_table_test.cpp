@@ -122,6 +122,7 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest1) {
   EXPECT_EQ(keys.size(), table.GetSize());
    
 }
+
 TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
   // 16,4,6,22,24,10,31,7,9,20,26.
   ExtendibleHashTable<int, int> table(4);

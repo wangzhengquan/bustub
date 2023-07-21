@@ -210,15 +210,7 @@ TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
     // std::cout << "----insert------" << key << std::endl;
     ASSERT_EQ(suc, true);
   }
-  Page* frames;
-  // bpm->UnpinPage(HEADER_PAGE_ID, true);
-  // Page* frames = bpm->GetFrames();
-  // for(size_t i = 0; i < pool_size; i++) {
-  //   Page &frame = frames[i];
-  //   EXPECT_EQ(frame.GetPinCount(), 0);
-  //   std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
-  // }
-
+  
   int64_t num_remove_keys = 100;
   for (int64_t key = num_remove_keys; key >= 0; --key) {
     index_key.SetFromInteger(key);
@@ -248,11 +240,12 @@ TEST(BPlusTreeTests, InsertOnAscent_DeleteOnDecent_Test) {
   bpm->UnpinPage(HEADER_PAGE_ID, true);
 
 
-  frames = bpm->GetFrames();
+  Page *frames = bpm->GetFrames();
   for(size_t i = 0; i < pool_size; i++) {
     Page &frame = frames[i];
     EXPECT_EQ(frame.GetPinCount(), 0);
-    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    if(frame.GetPinCount() != 0)
+      std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
   }
 
   delete transaction;
@@ -288,7 +281,7 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
   fs::create_directory("output1-1");
  
   std::vector<int64_t> keys;
-  for (int64_t key = 40; key > 0; key--) {
+  for (int64_t key = 100; key > 0; key--) {
    
     int64_t value = key & 0xFFFFFFFF;
     rid.Set(static_cast<int32_t>(key >> 32), value);
@@ -440,12 +433,12 @@ TEST(BPlusTreeTests, DeleteInterleave_Test) {
   bpm->UnpinPage(HEADER_PAGE_ID, true);
 
 
-  // Page *frames = bpm->GetFrames();
-  // for(size_t i = 0; i < pool_size; i++) {
-  //   Page &frame = frames[i];
-  //   EXPECT_EQ(frame.GetPinCount(), 0);
-  //   // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
-  // }
+  Page *frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
 
   delete transaction;
   delete disk_manager;
@@ -461,7 +454,8 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(50, disk_manager);
+  size_t pool_size = 50;
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
   // create and fetch header_page
   page_id_t page_id;
   auto header_page = bpm->NewPage(&page_id);
@@ -474,10 +468,12 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   auto *transaction = new Transaction(0);
 
   std::vector<int> keys;
+  std::set<int> keys_removed;
   std::srand(std::time(nullptr));
-  int num_keys = 100;
-  for(int i = 0; i< num_keys; i++){
-    int key = std::rand() % num_keys;
+  int scale = 1000;
+
+  for(int i = 0; i< scale; i++){
+    int key = std::rand() % scale;
     rid.Set(key, key);
     index_key.SetFromInteger(key);
     if(tree.Insert(index_key, rid, transaction)){
@@ -486,14 +482,14 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   }
    
 
-  std::vector<int> keys_removed;
-  for (int i = 0; i< num_keys; i++) {
-    int key = std::rand() % num_keys;
+  
+  for (int i = 0, end = scale*2; i < end; i++) {
+    int key = std::rand() % scale;
     
     index_key.SetFromInteger(key);
     if(tree.Remove(index_key, transaction)){
-      std::cout << "---remove--- " << key << std::endl;
-      keys_removed.push_back(key);
+      // std::cout << "---remove--- " << key << std::endl;
+      keys_removed.insert(key);
     }
   }
 
@@ -501,11 +497,15 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   EXPECT_EQ(tree.Check(), true);
 
   std::vector<RID> rids;
-  for(auto key :keys_removed){
+  for(auto key: keys){
     rids.clear();
     index_key.SetFromInteger(key);
-    EXPECT_EQ(tree.GetValue(index_key, &rids), false);
-
+    bool finded = tree.GetValue(index_key, &rids);
+    if(keys_removed.find(key) == keys_removed.end()){
+      EXPECT_EQ(finded, true);
+    } else {
+      EXPECT_EQ(finded, false);
+    }
   }
 
   int size = 0;
@@ -524,6 +524,12 @@ TEST(BPlusTreeTests, RandomInsertAndDelete) {
   
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
+  Page *frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
   delete transaction;
   delete disk_manager;
   delete bpm;
