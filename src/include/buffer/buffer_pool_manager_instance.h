@@ -55,6 +55,7 @@ class BufferPoolManagerInstance : public BufferPoolManager {
  // ==================== for test ================
 
   void Print();
+  auto Check() ->bool;
 
  protected:
   /**
@@ -163,8 +164,10 @@ private:
   std::list<frame_id_t> free_list_;
   ReaderWriterLatch free_list_latch_;
   /** This latch protects shared data structures. We recommend updating this comment to describe what it protects. */
-  // std::mutex mutex_;
-  ReaderWriterLatch pages_latch_;
+  std::mutex mutex_;
+  // ReaderWriterLatch latch_;
+
+  std::mutex mutex2_;
   
   std::atomic<size_t> current_timestamp_{0};
   
@@ -183,8 +186,8 @@ private:
     // This is a no-nop right now without a more complex data structure to track deallocated pages
   }
 
-  auto Victim(frame_id_t *frame_id) -> bool ;
-  auto Evict() -> frame_id_t;
+  auto Victim() -> frame_id_t ;
+  // auto Evict() -> frame_id_t;
 };
 
 }  // namespace bustub

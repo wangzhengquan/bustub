@@ -148,13 +148,83 @@ TEST(BufferPoolManagerInstanceTest, DISABLED_SampleTest) {
 }
 
 
-TEST(BufferPoolManagerInstanceTest, ConcurrentTest) {
+
+TEST(BufferPoolManagerInstanceTest, NewAndNew) {
   const std::string db_name = "test.db";
-  const size_t buffer_pool_size = 20;
+  const size_t pool_size = 20;
   const size_t k = 2;
 
   auto *disk_manager = new DiskManager(db_name);
-  auto *bpm = new BufferPoolManagerInstance(buffer_pool_size, disk_manager, k);
+  auto *bpm = new BufferPoolManagerInstance(pool_size, disk_manager, k);
+
+  std::mutex page_ids_mutex;
+  std::vector<page_id_t> page_ids;
+
+  std::mutex console_mutex;
+ 
+  TasksUtil t(32);
+
+   
+  t.addTask([&](size_t from, size_t to){
+    // std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id;
+      auto *page = bpm->NewPage(&page_id);
+      ASSERT_NE(nullptr, page);
+      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id);
+      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
+      page_ids_mutex.lock();
+      page_ids.push_back(page_id);
+      page_ids_mutex.unlock();
+      bpm->UnpinPage(page_id, true);
+    }
+  }, 4, pool_size*2);
+  
+
+  t.addTask([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "newpage task 2: from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id;
+      auto *page = bpm->NewPage(&page_id);
+      ASSERT_NE(nullptr, page);
+      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id);
+      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
+      bpm->UnpinPage(page_id, true);
+    }
+  }, 4, pool_size*2);
+
+   
+
+  t.run();
+
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // if(frame.GetPinCount() != 0){
+      // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    // }
+    
+  }
+
+   
+  // Shutdown the disk manager and remove the temporary file we created.
+  disk_manager->ShutDown();
+  remove("test.db");
+
+  delete bpm;
+  delete disk_manager;
+}
+
+TEST(BufferPoolManagerInstanceTest, FetchAndFetch) {
+  const std::string db_name = "test.db";
+  const size_t pool_size = 20;
+  const size_t k = 2;
+
+  auto *disk_manager = new DiskManager(db_name);
+  auto *bpm = new BufferPoolManagerInstance(pool_size, disk_manager, k);
 
   std::mutex page_ids_mutex;
   std::vector<page_id_t> page_ids;
@@ -165,30 +235,125 @@ TEST(BufferPoolManagerInstanceTest, ConcurrentTest) {
 
   std::list<TaskID> dep1;
   TaskID task_id = t.addTask([&](size_t from, size_t to){
-    std::cout << "task 1:" << std::endl;
+    // console_mutex.lock();
+    // std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
     for (size_t i = from; i < to; i++) {
-      page_id_t page_id_temp;
-      auto *page = bpm->NewPage(&page_id_temp);
+      page_id_t page_id;
+      auto *page = bpm->NewPage(&page_id);
       ASSERT_NE(nullptr, page);
-      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id_temp);
-      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id_temp));
+      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id);
+      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
       page_ids_mutex.lock();
-      page_ids.push_back(page_id_temp);
+      page_ids.push_back(page_id);
       page_ids_mutex.unlock();
-      bpm->UnpinPage(page_id_temp, true);
+      bpm->UnpinPage(page_id, true);
     }
-  }, 4, buffer_pool_size*2);
+  }, 4, pool_size*2);
   dep1.push_back(task_id);
 
  
-  std::list<TaskID> dep2;
-  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
-    std::cout << "task 2: from = " << from << ", to = " << to << std::endl;
-    EXPECT_EQ(page_ids.size(), buffer_pool_size*2);
+  // std::list<TaskID> dep2;
+   t.addTaskWithDeps([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "fetch task 1 : from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    EXPECT_EQ(page_ids.size(), pool_size*2);
     for (size_t i = from; i < to; i++) {
-      page_ids_mutex.lock();
       page_id_t page_id = page_ids[i];
+
+      auto *page = bpm->FetchPage(page_id);
+      ASSERT_NE(nullptr, page);
+      // ASSERT_NE(nullptr, page);
+      EXPECT_EQ(page_id, page->GetPageId());
+      char str[BUSTUB_PAGE_SIZE];
+      snprintf(str, BUSTUB_PAGE_SIZE, "Hello %d" , page->GetPageId());
+      EXPECT_EQ(0, strcmp(page->GetData(), str));
+      bpm->UnpinPage(page->GetPageId(), true);
+    }
+  }, 4, pool_size*2, dep1);
+
+  t.addTaskWithDeps([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "fetch task 2 : from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    EXPECT_EQ(page_ids.size(), pool_size*2);
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id = page_ids[i];
+
+      auto *page = bpm->FetchPage(page_id);
+      ASSERT_NE(nullptr, page);
+      // ASSERT_NE(nullptr, page);
+      EXPECT_EQ(page_id, page->GetPageId());
+      char str[BUSTUB_PAGE_SIZE];
+      snprintf(str, BUSTUB_PAGE_SIZE, "Hello %d" , page->GetPageId());
+      EXPECT_EQ(0, strcmp(page->GetData(), str));
+      bpm->UnpinPage(page->GetPageId(), true);
+    }
+  }, 4, pool_size*2, dep1);
+  
+
+  t.run();
+
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // if(frame.GetPinCount() != 0){
+      std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    // }
+    
+  }
+
+   
+  // Shutdown the disk manager and remove the temporary file we created.
+  disk_manager->ShutDown();
+  remove("test.db");
+
+  delete bpm;
+  delete disk_manager;
+}
+
+TEST(BufferPoolManagerInstanceTest, FetchAndDelete) {
+  const std::string db_name = "test.db";
+  const size_t pool_size = 20;
+  const size_t k = 2;
+
+  auto *disk_manager = new DiskManager(db_name);
+  auto *bpm = new BufferPoolManagerInstance(pool_size, disk_manager, k);
+
+  std::mutex page_ids_mutex;
+  std::vector<page_id_t> page_ids;
+
+  std::mutex console_mutex;
+ 
+  TasksUtil t(32);
+
+  std::list<TaskID> dep1;
+  TaskID task_id = t.addTask([&](size_t from, size_t to){
+    // std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id;
+      auto *page = bpm->NewPage(&page_id);
+      ASSERT_NE(nullptr, page);
+      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id);
+      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
+      page_ids_mutex.lock();
+      page_ids.push_back(page_id);
       page_ids_mutex.unlock();
+      bpm->UnpinPage(page_id, true);
+    }
+  }, 4, pool_size*2);
+  dep1.push_back(task_id);
+
+ 
+  t.addTaskWithDeps([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "delete task : from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    EXPECT_EQ(page_ids.size(), pool_size*2);
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id = page_ids[i];
 
       auto *page = bpm->FetchPage(page_id);
       ASSERT_NE(nullptr, page);
@@ -196,58 +361,167 @@ TEST(BufferPoolManagerInstanceTest, ConcurrentTest) {
       char str[BUSTUB_PAGE_SIZE];
       snprintf(str, BUSTUB_PAGE_SIZE, "Hello %d" , page->GetPageId());
       EXPECT_EQ(0, strcmp(page->GetData(), str));
+      bpm->DeletePage(page_id);
       bpm->UnpinPage(page->GetPageId(), true);
     }
-  }, 4, 40, dep1);
-  dep2.push_back(task_id);
+  }, 4, pool_size*2, dep1);
 
-  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
-    std::cout << "task 3: from = " << from << ", to = " << to << std::endl;
+
+  t.addTaskWithDeps([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "fetch task 2 : from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    EXPECT_EQ(page_ids.size(), pool_size*2);
     for (size_t i = from; i < to; i++) {
-      page_id_t page_id_temp;
-      auto *page = bpm->NewPage(&page_id_temp);
-      ASSERT_NE(nullptr, page);
-      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id_temp);
-      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id_temp));
-      page_ids_mutex.lock();
-      page_ids.push_back(page_id_temp);
-      page_ids_mutex.unlock();
-      bpm->UnpinPage(page_id_temp, true);
-    }
-  }, 4, buffer_pool_size*2, dep1);
-  dep2.push_back(task_id);
-
-  std::set<page_id_t> deleted_page_ids;
-  std::mutex deleted_page_ids_mutex;
-
-  std::list<TaskID> dep3;
-  // delete
-  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
-    std::cout << "task 4: from = " << from << ", to = " << to << std::endl;
-    for (size_t i = from; i < to; i++) {
-      
-      page_ids_mutex.lock();
-      // std::cout << "task 4: i = " << i  << std::endl;
       page_id_t page_id = page_ids[i];
-      page_ids_mutex.unlock();
-      if(bpm->DeletePage(page_id)){
-        // console_mutex.lock();
-        // std::cout << "task 4: del suc "  << std::endl;
-        // console_mutex.unlock();
-        deleted_page_ids_mutex.lock();
-        deleted_page_ids.insert(page_id);
-        deleted_page_ids_mutex.unlock();
-      } else {
-        // console_mutex.lock();
-        // std::cout << "task 4: del failed "  << std::endl;
-        // console_mutex.unlock();
-      }
 
+      auto *page = bpm->FetchPage(page_id);
+      ASSERT_NE(nullptr, page);
+      // ASSERT_NE(nullptr, page);
+      EXPECT_EQ(page_id, page->GetPageId());
+      // char str[BUSTUB_PAGE_SIZE];
+      // snprintf(str, BUSTUB_PAGE_SIZE, "Hello %d" , page->GetPageId());
+      // EXPECT_EQ(0, strcmp(page->GetData(), str));
+      bpm->UnpinPage(page->GetPageId(), true);
     }
-  }, 4, 80, dep2);
-  dep3.push_back(task_id);
+  }, 4, pool_size*2, dep1);
 
   t.run();
+
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // if(frame.GetPinCount() != 0){
+      // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    // }
+    
+  }
+
+   
+  // Shutdown the disk manager and remove the temporary file we created.
+  disk_manager->ShutDown();
+  remove("test.db");
+
+  delete bpm;
+  delete disk_manager;
+}
+
+TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
+  const std::string db_name = "test.db";
+  const size_t pool_size = 20;
+  const size_t k = 2;
+
+  auto *disk_manager = new DiskManager(db_name);
+  auto *bpm = new BufferPoolManagerInstance(pool_size, disk_manager, k);
+
+  std::mutex page_ids_mutex;
+  std::vector<page_id_t> page_ids;
+
+  std::mutex console_mutex;
+ 
+  TasksUtil t(32);
+
+  std::list<TaskID> dep1;
+  TaskID task_id = t.addTask([&](size_t from, size_t to){
+    std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id;
+      auto *page = bpm->NewPage(&page_id);
+      ASSERT_NE(nullptr, page);
+      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id);
+      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
+      page_ids_mutex.lock();
+      page_ids.push_back(page_id);
+      page_ids_mutex.unlock();
+      bpm->UnpinPage(page_id, true);
+    }
+  }, 4, pool_size*2);
+  dep1.push_back(task_id);
+
+ 
+   std::list<TaskID> dep2;
+   task_id = t.addTaskWithDeps([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "fetch task 1 : from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    EXPECT_EQ(page_ids.size(), pool_size*2);
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id = page_ids[i];
+
+      auto *page = bpm->FetchPage(page_id);
+      
+      ASSERT_NE(nullptr, page);
+      EXPECT_EQ(page_id, page->GetPageId());
+      char str[BUSTUB_PAGE_SIZE];
+      snprintf(str, BUSTUB_PAGE_SIZE, "Hello %d" , page->GetPageId());
+      EXPECT_EQ(0, strcmp(page->GetData(), str));
+      bpm->UnpinPage(page->GetPageId(), true);
+    }
+  }, 4, pool_size*2, dep1);
+  dep2.push_back(task_id);
+
+  task_id = t.addTaskWithDeps([&](size_t from, size_t to){
+    // std::cout << "fetch task 2 : from = " << from << ", to = " << to << std::endl;
+    EXPECT_EQ(page_ids.size(), pool_size*2);
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id = page_ids[i];
+
+      auto *page = bpm->FetchPage(page_id);
+       
+      ASSERT_NE(nullptr, page);
+      EXPECT_EQ(page_id, page->GetPageId());
+      char str[BUSTUB_PAGE_SIZE];
+      snprintf(str, BUSTUB_PAGE_SIZE, "Hello %d" , page->GetPageId());
+      EXPECT_EQ(0, strcmp(page->GetData(), str));
+      bpm->UnpinPage(page->GetPageId(), true);
+    }
+  }, 4, pool_size*2, dep1);
+  dep2.push_back(task_id);
+  
+
+  t.addTaskWithDeps([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "delete task : from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id = page_ids[i];
+
+      auto *page = bpm->FetchPage(page_id);
+      ASSERT_NE(nullptr, page);
+      EXPECT_EQ(page_id, page->GetPageId());
+      bpm->DeletePage(page_id);
+      bpm->UnpinPage(page->GetPageId(), true);
+    }
+  }, 4, pool_size*2, dep2);
+
+  t.addTask([&](size_t from, size_t to){
+    // console_mutex.lock();
+    // std::cout << "newpage task 2: from = " << from << ", to = " << to << std::endl;
+    // console_mutex.unlock();
+    for (size_t i = from; i < to; i++) {
+      page_id_t page_id;
+      auto *page = bpm->NewPage(&page_id);
+      ASSERT_NE(nullptr, page);
+      snprintf(page->GetData(), BUSTUB_PAGE_SIZE, "Hello %d" , page_id);
+      // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
+      bpm->UnpinPage(page_id, true);
+    }
+  }, 4, pool_size*2);
+
+   
+
+  t.run();
+
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    // if(frame.GetPinCount() != 0){
+      // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    // }
+    
+  }
 
    
   // Shutdown the disk manager and remove the temporary file we created.

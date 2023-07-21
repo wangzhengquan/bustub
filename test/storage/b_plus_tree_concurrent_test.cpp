@@ -421,6 +421,7 @@ TEST(BPlusTreeConcurrentTest, ConcurrentInsert1) {
   LaunchParallelTest(4, InsertHelper, &tree, keys);
 
   EXPECT_EQ(tree.Check(), true);
+  
   int64_t size = 0;
   GenericKey<8> pre ;
   pre.SetFromInteger(-1);
@@ -457,7 +458,7 @@ TEST(BPlusTreeConcurrentTest, ConcurrentDelete) {
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  size_t pool_size = 50;
+  size_t pool_size = 100;
   BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
   // create and fetch header_page
   page_id_t page_id;
@@ -507,7 +508,8 @@ TEST(BPlusTreeConcurrentTest, ConcurrentDelete) {
   for(size_t i = 0; i < pool_size; i++) {
     Page &frame = frames[i];
     EXPECT_EQ(frame.GetPinCount(), 0);
-    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    if(frame.GetPinCount() != 0)
+      std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
   }
 
 
@@ -520,13 +522,13 @@ TEST(BPlusTreeConcurrentTest, ConcurrentDelete) {
 
 
 
-TEST(BPlusTreeConcurrentTest, ConcurrentDeleteInsertAndDelete) {
+TEST(BPlusTreeConcurrentTest, ConcurrentInsertAndDelete) {
 
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  size_t pool_size = 50;
+  size_t pool_size = 500;
   BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
   // create and fetch header_page
   page_id_t page_id;
@@ -572,7 +574,7 @@ TEST(BPlusTreeConcurrentTest, ConcurrentDeleteInsertAndDelete) {
   t.run();
 
   EXPECT_EQ(tree.Check(), true);
-  tree.Draw(bpm, "tree-ConcurrentDeleteInsertAndDelete.dot");
+  tree.Draw(bpm, "tree-ConcurrentInsertAndDelete.dot");
   
 
   // std::vector<RID> rids;
@@ -603,7 +605,8 @@ TEST(BPlusTreeConcurrentTest, ConcurrentDeleteInsertAndDelete) {
   for(size_t i = 0; i < pool_size; i++) {
     Page &frame = frames[i];
     EXPECT_EQ(frame.GetPinCount(), 0);
-    // std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+    if(frame.GetPinCount() != 0)
+      std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
   }
 
   delete transaction;

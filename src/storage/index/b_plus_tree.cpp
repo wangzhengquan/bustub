@@ -72,94 +72,23 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 /**
  * remove 也会修改父节点，所以remove要锁定可能会修改的节点及其父亲节点
  */
-INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> *locked_list) -> LeafPage * {
-  if (root_page_id_ == INVALID_PAGE_ID) return nullptr;
-
-  BPlusTreePage * parent_page = nullptr, * grandparent_page = nullptr, * cur_page = nullptr;
-  cur_page = new_root_latch_;
-  if (op == Operation::FIND) {
-    cur_page->latch_.RLock();
-    locked_list->push_back(cur_page);
-  } else if (op == Operation::INSERT) {
-    cur_page->latch_.WLock();
-    locked_list->push_back(cur_page);
-  } else if (op == Operation::REMOVE) {
-    cur_page->latch_.WLock();
-  } 
-
-  grandparent_page = parent_page;
-  parent_page = cur_page;
- 
-  BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
-  cur_page = root_page;
-  if (op == Operation::FIND) {
-    cur_page->latch_.RLock();
-    UnlockPageList(locked_list, false, op);
-    locked_list->push_back(cur_page);
-  } else if (op == Operation::INSERT){
-    cur_page->latch_.WLock();
-    if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
-      UnlockPageList(locked_list, false, op);
-    }
-    locked_list->push_back(cur_page);
-  } else if (op == Operation::REMOVE) {
-    cur_page->latch_.WLock();
-    // locked_list->push_back(parent_page);
-  }
-
-  while (!cur_page->IsLeafPage()) {
-    grandparent_page = parent_page;
-    parent_page = cur_page;
-
-    InternalPage *cur_inter_page = static_cast<InternalPage *>(cur_page);
-    int i = cur_inter_page->IndexOfKey(key, comparator_);
-    BUSTUB_ASSERT(i >= 0, "Find error, invalide index %d", i);
-    cur_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(cur_inter_page->ValueAt(i))->GetData());
-    if (op == Operation::FIND) {
-      cur_page->latch_.RLock();
-      UnlockPageList(locked_list, false, op);
-      locked_list->push_back(cur_page);
-    }
-    else if (op == Operation::INSERT) {
-      cur_page->latch_.WLock();
-      if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
-        UnlockPageList(locked_list, false, op);
-      }
-      
-      locked_list->push_back(cur_page);
-    } else if (op == Operation::REMOVE) {
-      cur_page->latch_.WLock();
-      if (cur_page->GetSize() > cur_page->GetMinSize()) {
-        UnlockPageList(locked_list, false, op);
-      }
-      // 释放grandparent以前的锁
-      locked_list->push_back(grandparent_page);
-    }
-  }
-  if (op == Operation::REMOVE) {
-    locked_list->push_back(parent_page);
-    locked_list->push_back(cur_page);
-  }
-  LeafPage *cur_leaf_page = static_cast<LeafPage *>(cur_page);
-
-  return cur_leaf_page;
-}
-
 // INDEX_TEMPLATE_ARGUMENTS
 // auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> *locked_list) -> LeafPage * {
 //   if (root_page_id_ == INVALID_PAGE_ID) return nullptr;
 
-//   BPlusTreePage * parent_page = nullptr, * cur_page = nullptr;
+//   BPlusTreePage * parent_page = nullptr, * grandparent_page = nullptr, * cur_page = nullptr;
 //   cur_page = new_root_latch_;
 //   if (op == Operation::FIND) {
 //     cur_page->latch_.RLock();
 //     locked_list->push_back(cur_page);
-//   }  else {
+//   } else if (op == Operation::INSERT) {
+//     cur_page->latch_.WLock();
+//     locked_list->push_back(cur_page);
+//   } else if (op == Operation::REMOVE) {
 //     cur_page->latch_.WLock();
 //   } 
 
-//   // grandparent_page = parent_page;
+//   grandparent_page = parent_page;
 //   parent_page = cur_page;
  
 //   BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
@@ -168,18 +97,24 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
 //     cur_page->latch_.RLock();
 //     UnlockPageList(locked_list, false, op);
 //     locked_list->push_back(cur_page);
-//   }  else {
+//   } else if (op == Operation::INSERT){
 //     cur_page->latch_.WLock();
-//     locked_list->push_back(parent_page);
+//     if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
+//       UnlockPageList(locked_list, false, op);
+//     }
+//     locked_list->push_back(cur_page);
+//   } else if (op == Operation::REMOVE) {
+//     cur_page->latch_.WLock();
+//     // locked_list->push_back(parent_page);
 //   }
 
 //   while (!cur_page->IsLeafPage()) {
+//     grandparent_page = parent_page;
+//     parent_page = cur_page;
+
 //     InternalPage *cur_inter_page = static_cast<InternalPage *>(cur_page);
 //     int i = cur_inter_page->IndexOfKey(key, comparator_);
 //     BUSTUB_ASSERT(i >= 0, "Find error, invalide index %d", i);
-
-//     // grandparent_page = parent_page;
-//     parent_page = cur_page;
 //     cur_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(cur_inter_page->ValueAt(i))->GetData());
 //     if (op == Operation::FIND) {
 //       cur_page->latch_.RLock();
@@ -189,31 +124,96 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
 //     else if (op == Operation::INSERT) {
 //       cur_page->latch_.WLock();
 //       if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
-//         // 释放parent以前的锁
 //         UnlockPageList(locked_list, false, op);
 //       }
       
-//       locked_list->push_back(parent_page);
+//       locked_list->push_back(cur_page);
 //     } else if (op == Operation::REMOVE) {
 //       cur_page->latch_.WLock();
 //       if (cur_page->GetSize() > cur_page->GetMinSize()) {
-//          // 释放parent以前的锁
 //         UnlockPageList(locked_list, false, op);
 //       }
-     
-//       locked_list->push_back(parent_page);
+//       // 释放grandparent以前的锁
+//       locked_list->push_back(grandparent_page);
 //     }
-    
 //   }
-
-//   if (op != Operation::FIND) {
-//     // locked_list->push_back(parent_page);
+//   if (op == Operation::REMOVE) {
+//     locked_list->push_back(parent_page);
 //     locked_list->push_back(cur_page);
 //   }
 //   LeafPage *cur_leaf_page = static_cast<LeafPage *>(cur_page);
 
 //   return cur_leaf_page;
 // }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> *locked_list) -> LeafPage * {
+  if (root_page_id_ == INVALID_PAGE_ID) return nullptr;
+
+  BPlusTreePage * parent_page = nullptr, * cur_page = nullptr;
+  cur_page = new_root_latch_;
+  if (op == Operation::FIND) {
+    cur_page->latch_.RLock();
+    locked_list->push_back(cur_page);
+  }  else {
+    cur_page->latch_.WLock();
+  } 
+
+  // grandparent_page = parent_page;
+  parent_page = cur_page;
+ 
+  BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
+  cur_page = root_page;
+  if (op == Operation::FIND) {
+    cur_page->latch_.RLock();
+    UnlockPageList(locked_list, false, op);
+    locked_list->push_back(cur_page);
+  }  else {
+    cur_page->latch_.WLock();
+    locked_list->push_back(parent_page);
+  }
+
+  while (!cur_page->IsLeafPage()) {
+    InternalPage *cur_inter_page = static_cast<InternalPage *>(cur_page);
+    int i = cur_inter_page->IndexOfKey(key, comparator_);
+    BUSTUB_ASSERT(i >= 0, "Find error, invalide index %d", i);
+
+    // grandparent_page = parent_page;
+    parent_page = cur_page;
+    cur_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(cur_inter_page->ValueAt(i))->GetData());
+    if (op == Operation::FIND) {
+      cur_page->latch_.RLock();
+      UnlockPageList(locked_list, false, op);
+      locked_list->push_back(cur_page);
+    }
+    else if (op == Operation::INSERT) {
+      cur_page->latch_.WLock();
+      if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
+        // 释放parent以前的锁
+        UnlockPageList(locked_list, false, op);
+      }
+      
+      locked_list->push_back(parent_page);
+    } else if (op == Operation::REMOVE) {
+      cur_page->latch_.WLock();
+      if (cur_page->GetSize() > cur_page->GetMinSize()) {
+         // 释放parent以前的锁
+        UnlockPageList(locked_list, false, op);
+      }
+     
+      locked_list->push_back(parent_page);
+    }
+    
+  }
+
+  if (op != Operation::FIND) {
+    // locked_list->push_back(parent_page);
+    locked_list->push_back(cur_page);
+  }
+  LeafPage *cur_leaf_page = static_cast<LeafPage *>(cur_page);
+
+  return cur_leaf_page;
+}
  
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::UnlockPageList(std::list<BPlusTreePage *> *locked_list, bool dirty, const Operation op) {
