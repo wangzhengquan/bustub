@@ -233,7 +233,7 @@ TEST(BufferPoolManagerInstanceTest, FetchAndFetch) {
  
   TasksUtil t(32);
 
-  std::list<TaskID> dep1;
+  std::vector<TaskID> dep1;
   TaskID task_id = t.addTask([&](size_t from, size_t to){
     // console_mutex.lock();
     // std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
@@ -329,7 +329,7 @@ TEST(BufferPoolManagerInstanceTest, FetchAndDelete) {
  
   TasksUtil t(32);
 
-  std::list<TaskID> dep1;
+  std::vector<TaskID> dep1;
   TaskID task_id = t.addTask([&](size_t from, size_t to){
     // std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
     for (size_t i = from; i < to; i++) {
@@ -422,7 +422,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
  
   TasksUtil t(32);
 
-  std::list<TaskID> dep1;
+  std::vector<TaskID> dep1;
   TaskID task_id = t.addTask([&](size_t from, size_t to){
     std::cout << "newpage task 1: from = " << from << ", to = " << to << std::endl;
     for (size_t i = from; i < to; i++) {
@@ -440,7 +440,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
   dep1.push_back(task_id);
 
  
-   std::list<TaskID> dep2;
+   std::vector<TaskID> dep2;
    task_id = t.addTaskWithDeps([&](size_t from, size_t to){
     // console_mutex.lock();
     // std::cout << "fetch task 1 : from = " << from << ", to = " << to << std::endl;

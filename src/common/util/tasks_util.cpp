@@ -13,6 +13,7 @@ TasksUtil::TasksUtil(int total_num_workers) : total_num_workers_(total_num_worke
 
 void TasksUtil::run(){
   if(ready_queue.state_ != State::Ready){
+    sync();
     return;
   }
   workers_.reserve(total_num_workers_);
@@ -27,14 +28,14 @@ void TasksUtil::run(){
           break;
         }
 
-        if (ready_queue.queue.empty()) {
+        if (ready_queue.elements.empty()) {
           ready_queue.cv.wait(ready_queue_lock);
           ready_queue_lock.unlock();
         } else {
-          std::shared_ptr<ReadyTask> ready_task = ready_queue.queue.front();
+          std::shared_ptr<ReadyTask> ready_task = ready_queue.elements.front();
           size_t worker_id = ready_task->worker_id_++;
           if (worker_id >= ready_task->num_workers_) {
-            ready_queue.queue.pop();
+            ready_queue.elements.pop();
             ready_queue_lock.unlock();
           } else {
             ready_queue_lock.unlock();
@@ -59,28 +60,30 @@ void TasksUtil::run(){
               }
 
               std::unique_lock<std::mutex> complete_queue_lock(complete_queue.mutex);
-              complete_queue.queue.insert(ready_task->task_id_);
+              complete_queue.elements.insert(ready_task->task_id_);
               complete_queue_lock.unlock();
 
               // finished bulk tasks, search the bulk  which has dependence with this bulk
               std::unique_lock<std::mutex> wait_queue_lock(wait_queue.mutex);
-              for (auto wait_queue_it = wait_queue.queue.begin(); wait_queue_it != wait_queue.queue.end();) {
+              for (auto wait_queue_it = wait_queue.elements.begin(); wait_queue_it != wait_queue.elements.end();) {
                 WaitTask &wait_task = *wait_queue_it;
-                for (auto it = wait_task.deps_.begin(); it != wait_task.deps_.end();) {
-                  if (*it == ready_task->task_id_) {
-                    it = wait_task.deps_.erase(it);
-                    break;
-                  } else
-                    ++it;
-                }
+                // for (auto it = wait_task.deps_.begin(); it != wait_task.deps_.end();) {
+                //   if (*it == ready_task->task_id_) {
+                //     it = wait_task.deps_.erase(it);
+                //     break;
+                //   } else
+                //     ++it;
+                // }
+
+                wait_task.deps_.erase(ready_task->task_id_);
 
                 if (wait_task.deps_.empty()) {
                   ready_queue_lock.lock();
-                  ready_queue.queue.push(std::shared_ptr<ReadyTask>(
+                  ready_queue.elements.push(std::shared_ptr<ReadyTask>(
                       new ReadyTask{wait_task.task_id_, wait_task.work_, wait_task.num_workers_, wait_task.total_amount_works_}));
                   ready_queue_lock.unlock();
                   ready_queue.cv.notify_all();
-                  wait_queue_it = wait_queue.queue.erase(wait_queue_it);
+                  wait_queue_it = wait_queue.elements.erase(wait_queue_it);
 
                 } else {
                   ++wait_queue_it;
@@ -111,17 +114,17 @@ TasksUtil::~TasksUtil() {
 }
 
 TaskID TasksUtil::addTask(WorkFunction work, size_t num_workers, size_t total_amount_works) {
-  std::list<TaskID> deps;
+  std::vector<TaskID> deps;
   return addTaskWithDeps(std::move(work), num_workers, total_amount_works, deps);
 }
 //runAsyncWithDeps
-TaskID TasksUtil::addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, std::list<TaskID> &deps) {
+TaskID TasksUtil::addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &deps) {
   ++ready_queue.num_total_tasks;
-  std::list<TaskID> newdeps;
+  std::set<TaskID> newdeps;
   std::unique_lock<std::mutex> complete_queue_lock(complete_queue.mutex);
   for (TaskID dep : deps) {
-    if (complete_queue.queue.find(dep) == complete_queue.queue.end()) {
-      newdeps.push_back(dep);
+    if (complete_queue.elements.find(dep) == complete_queue.elements.end()) {
+      newdeps.insert(dep);
     }
   }
 
@@ -129,14 +132,14 @@ TaskID TasksUtil::addTaskWithDeps(WorkFunction work, size_t num_workers, size_t 
     complete_queue_lock.unlock();
     std::unique_lock<std::mutex> lock(ready_queue.mutex);
     TaskID task_id = next_task_id_++;
-    ready_queue.queue.push(std::shared_ptr<ReadyTask>(new ReadyTask{task_id, work, num_workers, total_amount_works}));
+    ready_queue.elements.push(std::shared_ptr<ReadyTask>(new ReadyTask{task_id, work, num_workers, total_amount_works}));
     lock.unlock();
     ready_queue.cv.notify_all();
     return task_id;
   } else {
     std::unique_lock<std::mutex> lock(wait_queue.mutex);
     TaskID task_id = next_task_id_++;
-    wait_queue.queue.push_back(WaitTask{task_id, work, num_workers, total_amount_works, newdeps});
+    wait_queue.elements.push_back(WaitTask{task_id, work, num_workers, total_amount_works, newdeps});
     complete_queue_lock.unlock();
     lock.unlock();
     return task_id;

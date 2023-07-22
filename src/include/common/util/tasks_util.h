@@ -16,22 +16,6 @@
 typedef int TaskID;
 
 
-// class IRunnable {
-//  public:
-//   virtual ~IRunnable();
-
-//   /*
-//     Executes an instance of the task as part of a bulk task launch.
-
-//       - task_id: the current task identifier. This value will be
-//         between 0 and num_total_tasks-1.
-
-//       - num_total_tasks: the total number of tasks in the bulk
-//         task launch.
-//     */
-//   virtual void runTask(int task_id, int num_total_tasks) = 0;
-// };
-
 class TasksUtil {
   //< from, to>
   using WorkFunction =  std::function<void(size_t, size_t)>;
@@ -64,8 +48,8 @@ class TasksUtil {
     WorkFunction work_;
     const size_t num_workers_;
     const size_t total_amount_works_;
-    std::list<TaskID> deps_{};
-    WaitTask(TaskID task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works, std::list<TaskID> &deps)
+    std::set<TaskID> deps_{};
+    WaitTask(TaskID task_id, WorkFunction &work, size_t num_workers, size_t total_amount_works, std::set<TaskID> &deps)
         : task_id_(task_id), 
           work_(std::move(work)), 
           num_workers_(num_workers), 
@@ -75,7 +59,7 @@ class TasksUtil {
 
   class CompleteQueue {
    public:
-    std::set<TaskID> queue{};
+    std::set<TaskID> elements{};
     std::mutex mutex;
   };
 
@@ -83,7 +67,7 @@ class TasksUtil {
    public:
     std::mutex mutex;
     std::condition_variable cv;
-    std::queue<std::shared_ptr<ReadyTask> > queue{};
+    std::queue<std::shared_ptr<ReadyTask> > elements{};
     State state_ = State::Ready;
 
     std::mutex num_tasks_complete_mutex;
@@ -94,7 +78,7 @@ class TasksUtil {
 
   class WaitQueue {
    public:
-    std::list<WaitTask> queue;
+    std::list<WaitTask> elements;
     std::mutex mutex;
     std::condition_variable cv;
   };
@@ -111,7 +95,7 @@ class TasksUtil {
   /*
     Instantiates a task system.
 
-      - num_threads: the maximum number of threads that the task system
+      - total_num_workers: the maximum number of threads that the task system
         can use.
     */
   explicit TasksUtil(int total_num_workers);
@@ -144,7 +128,7 @@ class TasksUtil {
     runAsnycWithDeps() to specify a dependency of some future
     bulk task launch on this bulk task launch.
     */
-  TaskID addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, std::list<TaskID> &deps);
+  TaskID addTaskWithDeps(WorkFunction work, size_t num_workers, size_t total_amount_works, const std::vector<TaskID> &deps);
 
   /*
     Blocks until all tasks created as a result of **any prior**
