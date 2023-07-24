@@ -73,7 +73,7 @@ class BPlusTree {
   // draw the B+ tree
   void Draw(BufferPoolManager *bpm, const std::string &outf);
 
-  auto Check() const -> bool ;
+  auto Check() -> bool ;
 
   // read data from file and insert one by one
   void InsertFromFile(const std::string &file_name, Transaction *transaction = nullptr);
@@ -83,13 +83,13 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
-  void UnlockPageList(std::list<BPlusTreePage *> *locked_list, bool dirty, const Operation op);
-  void PrintLockedPageList(std::list<BPlusTreePage *> *locked_list);
-  auto Check_(BPlusTreePage *page) const -> bool ;
+  void UnlockPageList(std::list<BPlusTreePage *> &locked_list, bool dirty, const Operation op);
+  // void PrintLockedPageList(std::list<BPlusTreePage *> &locked_list);
+  auto Check_(BPlusTreePage *page) -> bool ;
   /**
    * @insert find for insert
    */
-  auto Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> *locked_list)
+  auto Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> &locked_list)
       -> BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *;
   /**
    * Insert  {key, value} into LeafPage
@@ -125,7 +125,7 @@ class BPlusTree {
   int internal_max_size_;
   page_id_t root_page_id_ = INVALID_PAGE_ID;
   // It is employed as a lock instead of using it as a real page.
-  BPlusTreePage * new_root_latch_;
+  BPlusTreePage * new_root_page_;
   // BPlusTreePage* root_page_ = nullptr;
 };
 

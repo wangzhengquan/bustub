@@ -15,8 +15,8 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, BufferPoolManager *buffer_pool_manag
       comparator_(comparator),
       leaf_max_size_(leaf_max_size),
       internal_max_size_(internal_max_size) {
-  new_root_latch_ = new BPlusTreePage();
-  new_root_latch_->page_id_ = INVALID_PAGE_ID;
+  new_root_page_ = new BPlusTreePage();
+  new_root_page_->page_id_ = INVALID_PAGE_ID;
   //  std::cout << "=========root_page_id_=========" << root_page_id_ << std::endl;
   auto *header_page = static_cast<HeaderPage *>(bpm_->FetchPage(HEADER_PAGE_ID));
   header_page->GetRootId(index_name_, &root_page_id_);
@@ -25,7 +25,7 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, BufferPoolManager *buffer_pool_manag
 
 INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::~BPlusTree() {
-  delete new_root_latch_;
+  delete new_root_page_;
 }
 /*
  * Helper function to decide whether current b+tree is empty
@@ -52,19 +52,19 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
   std::list<BPlusTreePage *> locked_list;
-  auto *leaf_page = Find(key, Operation::FIND, &locked_list);
+  auto *leaf_page = Find(key, Operation::FIND, locked_list);
   if (leaf_page == nullptr) {
-    UnlockPageList(&locked_list, false, Operation::FIND);
+    UnlockPageList(locked_list, false, Operation::FIND);
     return false;
   }
 
   int i = leaf_page->IndexOfKey(key, comparator_);
   if (i == -1) {
-    UnlockPageList(&locked_list, false, Operation::FIND);
+    UnlockPageList(locked_list, false, Operation::FIND);
     return false;
   } else {
     result->push_back(leaf_page->ValueAt(i));
-    UnlockPageList(&locked_list, false, Operation::FIND);
+    UnlockPageList(locked_list, false, Operation::FIND);
     return true;
   }
 }
@@ -77,7 +77,7 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 //   if (root_page_id_ == INVALID_PAGE_ID) return nullptr;
 
 //   BPlusTreePage * parent_page = nullptr, * grandparent_page = nullptr, * cur_page = nullptr;
-//   cur_page = new_root_latch_;
+//   cur_page = new_root_page_;
 //   if (op == Operation::FIND) {
 //     cur_page->latch_.RLock();
 //     locked_list->push_back(cur_page);
@@ -147,14 +147,14 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 // }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> *locked_list) -> LeafPage * {
+auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> &locked_list) -> LeafPage * {
   if (root_page_id_ == INVALID_PAGE_ID) return nullptr;
 
   BPlusTreePage * parent_page = nullptr, * cur_page = nullptr;
-  cur_page = new_root_latch_;
+  cur_page = new_root_page_;
   if (op == Operation::FIND) {
     cur_page->latch_.RLock();
-    locked_list->push_back(cur_page);
+    locked_list.push_back(cur_page);
   }  else {
     cur_page->latch_.WLock();
   } 
@@ -167,10 +167,10 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
   if (op == Operation::FIND) {
     cur_page->latch_.RLock();
     UnlockPageList(locked_list, false, op);
-    locked_list->push_back(cur_page);
+    locked_list.push_back(cur_page);
   }  else {
     cur_page->latch_.WLock();
-    locked_list->push_back(parent_page);
+    locked_list.push_back(parent_page);
   }
 
   while (!cur_page->IsLeafPage()) {
@@ -184,7 +184,7 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
     if (op == Operation::FIND) {
       cur_page->latch_.RLock();
       UnlockPageList(locked_list, false, op);
-      locked_list->push_back(cur_page);
+      locked_list.push_back(cur_page);
     }
     else if (op == Operation::INSERT) {
       cur_page->latch_.WLock();
@@ -193,7 +193,7 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
         UnlockPageList(locked_list, false, op);
       }
       
-      locked_list->push_back(parent_page);
+      locked_list.push_back(parent_page);
     } else if (op == Operation::REMOVE) {
       cur_page->latch_.WLock();
       if (cur_page->GetSize() > cur_page->GetMinSize()) {
@@ -201,14 +201,14 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
         UnlockPageList(locked_list, false, op);
       }
      
-      locked_list->push_back(parent_page);
+      locked_list.push_back(parent_page);
     }
     
   }
 
   if (op != Operation::FIND) {
-    // locked_list->push_back(parent_page);
-    locked_list->push_back(cur_page);
+    // locked_list.push_back(parent_page);
+    locked_list.push_back(cur_page);
   }
   LeafPage *cur_leaf_page = static_cast<LeafPage *>(cur_page);
 
@@ -216,14 +216,12 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
 }
  
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::UnlockPageList(std::list<BPlusTreePage *> *locked_list, bool dirty, const Operation op) {
+void BPLUSTREE_TYPE::UnlockPageList(std::list<BPlusTreePage *> &locked_list, bool dirty, const Operation op) {
   // std::cout << "-------------- UnlockPageList -------------" << std::endl;
-  if (locked_list == nullptr) {
-    return;
-  }
+   
 
-  while (!locked_list->empty()) {
-    BPlusTreePage *page = locked_list->front();
+  while (!locked_list.empty()) {
+    BPlusTreePage *page = locked_list.front();
 // std::cout << page->GetPageId() << " | ";
     if(op == Operation::FIND){
       page->latch_.RUnlock();
@@ -231,25 +229,16 @@ void BPLUSTREE_TYPE::UnlockPageList(std::list<BPlusTreePage *> *locked_list, boo
       page->latch_.WUnlock();
     }
     
-    if(page != new_root_latch_) {
+    if(page != new_root_page_) {
       bpm_->UnpinPage(page->GetPageId(), dirty);
     }
-    locked_list->pop_front();
+    locked_list.pop_front();
   }
 
 // std::cout << "\n------------------------------------------" << std::endl;
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::PrintLockedPageList(std::list<BPlusTreePage *> *locked_list) {
-  std::cout << "-------------- UnlockPageList -------------" << std::endl;
-  if (locked_list != nullptr) {
-    for(BPlusTreePage *page : *locked_list){
-      LOG_DEBUG("unlock pageid=%d\n", page->GetPageId() );
-    }
-  }
-  std::cout << "------------------------------------------" << std::endl;
-}
+ 
 
 /*****************************************************************************
  * INSERTION
@@ -265,7 +254,7 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
   // std::cout << "insert " << key << std::endl;
   if (root_page_id_ == INVALID_PAGE_ID) {
-    new_root_latch_->latch_.WLock();
+    new_root_page_->latch_.WLock();
     if (root_page_id_ == INVALID_PAGE_ID) {
       page_id_t root_page_id;
       LeafPage *root_page = reinterpret_cast<LeafPage *>(bpm_->NewPage(&root_page_id)->GetData());
@@ -277,19 +266,19 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
       root_page->latch_.WUnlock();
       bpm_->UnpinPage(root_page_id, true);
     }
-    new_root_latch_->latch_.WUnlock();
+    new_root_page_->latch_.WUnlock();
   } 
    
 
   std::list<BPlusTreePage *> locked_list;
 
-  LeafPage *page = Find(key, Operation::INSERT, &locked_list);
+  LeafPage *page = Find(key, Operation::INSERT, locked_list);
   if (page->IndexOfKey(key, comparator_) != -1) {
-    UnlockPageList(&locked_list, false, Operation::INSERT);
+    UnlockPageList(locked_list, false, Operation::INSERT);
     return false;
   }
   InsertInLeafPage(page, key, value);
-  UnlockPageList(&locked_list, true, Operation::INSERT);
+  UnlockPageList(locked_list, true, Operation::INSERT);
   return true;
 }
 
@@ -399,19 +388,19 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) -> bool {
 // std::cout << "Remove: " << key << std::endl;
   std::list<BPlusTreePage *> locked_list;
-  LeafPage *leaf_page = Find(key, Operation::REMOVE, &locked_list);
+  LeafPage *leaf_page = Find(key, Operation::REMOVE, locked_list);
   if (leaf_page == nullptr) {
-    UnlockPageList(&locked_list, false, Operation::REMOVE );
+    UnlockPageList(locked_list, false, Operation::REMOVE );
     return false;
   }
 
   int i = leaf_page->IndexOfKey(key, comparator_);
   if (i == -1) {
-    UnlockPageList(&locked_list, false, Operation::REMOVE);
+    UnlockPageList(locked_list, false, Operation::REMOVE);
     return false;
   }
   RemoveInLeafPage(leaf_page, i, key);
-  UnlockPageList(&locked_list, true, Operation::REMOVE);
+  UnlockPageList(locked_list, true, Operation::REMOVE);
   return true;
 }
 
@@ -674,7 +663,7 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
     return INDEXITERATOR_TYPE();
   }
   std::list<BPlusTreePage *> locked_list;
-  auto *leaf_page = Find(key, Operation::FIND, &locked_list);
+  auto *leaf_page = Find(key, Operation::FIND, locked_list);
   int i = leaf_page->IndexOfKey(key, comparator_);
   // UnlockPageList(&locked_list, false, Operation::FIND);
 
@@ -781,7 +770,6 @@ void BPLUSTREE_TYPE::Draw(BufferPoolManager *bpm, const std::string &outf) {
   out << "}" << std::endl;
   out.flush();
   out.close();
-  std::cout << "Generated " << outf << std::endl;
 }
 
 /**
@@ -795,6 +783,25 @@ void BPLUSTREE_TYPE::Print(BufferPoolManager *bpm) {
   }
   ToString(reinterpret_cast<BPlusTreePage *>(bpm->FetchPage(root_page_id_)->GetData()), bpm);
 }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::Check()  -> bool{
+  // std::list<BPlusTreePage *> locked_list;
+  // new_root_page_->latch_.RLock();
+  // locked_list->push_back(new_root_page_);
+  if (IsEmpty()) {
+    LOG_WARN("Check an empty tree");
+    // UnlockPageList(&locked_list, false, Operation::FIND);
+    return true;
+  }
+  BPlusTreePage * root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
+  // root_page->latch_.RLock();
+  // locked_list->push_back(root_page);
+  bool suc =  Check_(root_page);
+  // UnlockPageList(&locked_list, false, Operation::FIND);
+  return suc;
+}
+
 
 /**
  * This method is used for debug only, You don't need to modify
@@ -922,18 +929,10 @@ void BPLUSTREE_TYPE::ToString(BPlusTreePage *page, BufferPoolManager *bpm) const
   bpm->UnpinPage(page->GetPageId(), false);
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Check() const -> bool{
-  if (IsEmpty()) {
-    LOG_WARN("Check an empty tree");
-    return true;
-  }
-  return Check_(reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData()));
-}
 
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Check_(BPlusTreePage *page) const -> bool{
+auto BPLUSTREE_TYPE::Check_(BPlusTreePage *page) -> bool{
   bool suc = true;
   if (page->IsLeafPage()) {
     auto *leaf = reinterpret_cast<LeafPage *>(page);

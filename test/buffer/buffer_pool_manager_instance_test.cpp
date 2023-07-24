@@ -409,7 +409,8 @@ TEST(BufferPoolManagerInstanceTest, FetchAndDelete) {
 
 TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
   const std::string db_name = "test.db";
-  const size_t pool_size = 20;
+  const size_t pool_size = 100;
+  const size_t scale = 100;
   const size_t k = 2;
 
   auto *disk_manager = new DiskManager(db_name);
@@ -436,7 +437,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
       page_ids_mutex.unlock();
       bpm->UnpinPage(page_id, true);
     }
-  }, 4, pool_size*2);
+  }, 4, pool_size*scale);
   dep1.push_back(task_id);
 
  
@@ -445,7 +446,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
     // console_mutex.lock();
     // std::cout << "fetch task 1 : from = " << from << ", to = " << to << std::endl;
     // console_mutex.unlock();
-    EXPECT_EQ(page_ids.size(), pool_size*2);
+    EXPECT_EQ(page_ids.size(), pool_size*scale);
     for (size_t i = from; i < to; i++) {
       page_id_t page_id = page_ids[i];
 
@@ -458,12 +459,12 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
       EXPECT_EQ(0, strcmp(page->GetData(), str));
       bpm->UnpinPage(page->GetPageId(), true);
     }
-  }, 4, pool_size*2, dep1);
+  }, 4, pool_size*scale, dep1);
   dep2.push_back(task_id);
 
   task_id = t.addTaskWithDeps([&](size_t from, size_t to){
     // std::cout << "fetch task 2 : from = " << from << ", to = " << to << std::endl;
-    EXPECT_EQ(page_ids.size(), pool_size*2);
+    EXPECT_EQ(page_ids.size(), pool_size*scale);
     for (size_t i = from; i < to; i++) {
       page_id_t page_id = page_ids[i];
 
@@ -476,7 +477,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
       EXPECT_EQ(0, strcmp(page->GetData(), str));
       bpm->UnpinPage(page->GetPageId(), true);
     }
-  }, 4, pool_size*2, dep1);
+  }, 4, pool_size*scale, dep1);
   dep2.push_back(task_id);
   
 
@@ -493,7 +494,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
       bpm->DeletePage(page_id);
       bpm->UnpinPage(page->GetPageId(), true);
     }
-  }, 4, pool_size*2, dep2);
+  }, 4, pool_size*scale, dep2);
 
   t.addTask([&](size_t from, size_t to){
     // console_mutex.lock();
@@ -507,7 +508,7 @@ TEST(BufferPoolManagerInstanceTest, New_Fetch_Delete) {
       // EXPECT_EQ(0, strcmp(page->GetData(), "Hello %d", page_id));
       bpm->UnpinPage(page_id, true);
     }
-  }, 4, pool_size*2);
+  }, 4, pool_size*scale);
 
    
 

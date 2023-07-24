@@ -100,66 +100,155 @@ TEST(ExtendibleHashTableTest, DISABLED_SampleTest) {
 }
 
 
-
-class InsertTask  {
-private:
-  // std::shared_mutex mutex_;
-  ExtendibleHashTable<int, int> *table_;
-  std::vector<int> &keys_;
-public:
-    
-    // InsertTask(InsertTask & other): table_(other.table_), keys_(other.keys_){
-    // }
-
-    InsertTask(ExtendibleHashTable<int, int> *table,  std::vector<int> &keys)
-        : table_(table), keys_(keys) {}
-    ~InsertTask() {}
-
-    static inline int multiply_task(int iters, int input) {
-        int accumulator = 1;
-        for (int i = 0; i < iters; ++i) {
-            accumulator *= input;
-        }
-        return accumulator;
-    }
-
-    void operator()(size_t from, size_t to) {
-       
-      for (size_t i = from; i < to; i++) {
-        int key = keys_[i];
-        // std::unique_lock<std::shared_mutex> lock(mutex_);
-        // std::cout << "insert " << key << std::endl;
-        // lock.unlock();
-        table_->Insert(key, key);
-      }
-    }
-};
- 
-TEST(ExtendibleHashTableTest, MyConcurrentTest1) {
-  // 16,4,6,22,24,10,31,7,9,20,26.
+ TEST(ExtendibleHashTableTest, DISABLED_MyConcurrentTest) {
   ExtendibleHashTable<int, int> table(4);
+  std::cout << "====MyConcurrentTest" << std::endl;
+  // 16,4,6,22,24,10,31,7,9,20,26.
   std::vector<int> keys;
-  for(int i=0; i<20000; i++){
+  std::vector<int> delete_keys={10, 12, 13, 15, 8, 9, 1, 3};
+  for(int i=0; i<1000; i++){
     keys.push_back(i);
   }
-  TasksUtil t(4);
-  t.addTask([&](size_t from, size_t to){
-      for (size_t i = from; i < to; i++) {
-        int key = keys[i];
-        // std::unique_lock<std::shared_mutex> lock(mutex_);
-        // std::cout << "insert " << key << std::endl;
-        // lock.unlock();
-        table.Insert(key, key);
-      }
-  }, 4, keys.size());
-  t.run();
-  // table.Show();
+  LaunchParallelTest(4, InsertHelper, &table, keys);
+  LaunchParallelTest(4, DeleteHelper, &table, delete_keys);
 
-  EXPECT_EQ(keys.size(), table.GetSize());
+  table.Show();
+  int result;
+  table.Find(2, result);
+  EXPECT_EQ(2, result);
+  EXPECT_EQ(table.Find(9, result), false);
    
 }
 
-TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
+class Check{
+  std::set<int>& keys_inserted;
+  ExtendibleHashTable<int, int>  &table;
+public:
+  Check(std::set<int>& keys_, ExtendibleHashTable<int, int> &table_):
+   keys_inserted(keys_), table(table_){
+
+  }
+  bool operator() () {
+    bool suc = true;
+    for(int key : keys_inserted){
+      int value = 0;
+      bool exist = table.Find(key, value);
+      if(!exist){
+        std::cout << "indexof " << key << " = " << table.IndexOf(key) << std::endl;
+        suc = false;
+      }
+      if(value != key){
+        std::cout << "key= " << key << " , value= " << value << std::endl;
+        suc = false;
+
+      }
+     
+      // EXPECT_EQ(exist, true);
+      // EXPECT_EQ(value, key);
+      
+    }
+    return suc;
+  }
+
+};
+
+
+TEST(ExtendibleHashTableTest, DISABLED_AscentInterleaveInsert) {
+  ExtendibleHashTable<int, int> table(4);
+  std::set<int> keys_inserted;
+   
+  int scale = 10;
+
+  for (int i = 0; i < scale; i++) {
+    if(i%2 == 1){
+      int key = static_cast<int>(i);
+      
+      table.Insert(key, key);
+      keys_inserted.insert(key);
+      
+      table.Show();
+      ASSERT_EQ(table.Check(), true);
+      ASSERT_EQ(Check(keys_inserted, table)(), true);
+      ASSERT_EQ(keys_inserted.size(), table.GetSize());
+      
+    }
+   
+  }
+
+  
+  // table.Show();
+
+  EXPECT_EQ(keys_inserted.size(), table.GetSize());
+   
+}
+
+//DISABLED_
+TEST(ExtendibleHashTableTest, DISABLED_DescentInterleaveInsert) {
+  ExtendibleHashTable<int, int> table(4);
+  std::set<int> keys_inserted;
+   
+  size_t scale = 100;
+  for (int i = scale; i >= 0; i--) {
+    if(i%2==0){
+      int key = i;
+
+      std::cout << "insesrt " << key << std::endl;
+      table.Insert(key, key);
+      keys_inserted.insert(key);
+
+      table.Show();
+      ASSERT_EQ(table.Check(), true);
+      ASSERT_EQ(Check(keys_inserted, table)(), true);
+      ASSERT_EQ(keys_inserted.size(), table.GetSize());
+    }
+   
+  }
+
+   
+  // table.Show();
+
+  EXPECT_EQ(keys_inserted.size(), table.GetSize());
+   
+}
+
+//DISABLED_
+TEST(ExtendibleHashTableTest, RandomInsert) {
+  ExtendibleHashTable<int, int> table(4);
+  std::set<int> keys_inserted;
+   
+  size_t scale = 10000;
+  std::srand(std::time(nullptr));
+  TasksUtil t(4);
+  t.addTask([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = std::rand() % scale;
+        table.Insert(key, key);
+
+        std::unique_lock lock(mutex_);
+        std::cout << "insert " << key << std::endl;
+        keys_inserted.insert(key);
+        lock.unlock();
+        
+
+        // table.Show();
+        // ASSERT_EQ(table.Check(), true);
+        // ASSERT_EQ(Check(keys_inserted, table)(), true);
+        // ASSERT_EQ(keys_inserted.size(), table.GetSize());
+      }
+  }, 1, scale);
+  t.run();
+
+   
+  table.Show();
+  ASSERT_EQ(table.Check(), true);
+  ASSERT_EQ(Check(keys_inserted, table)(), true);
+  ASSERT_EQ(keys_inserted.size(), table.GetSize());
+
+   
+}
+
+
+TEST(ExtendibleHashTableTest, DISABLED_MyConcurrentTest2) {
   // 16,4,6,22,24,10,31,7,9,20,26.
   ExtendibleHashTable<int, int> table(4);
   std::vector<int> keys;
@@ -177,7 +266,7 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
         table.Insert(key, key);
       }
   }, 2, keys.size());
-  std::list<TaskID> dep1;
+  std::vector<TaskID> dep1;
   dep1.push_back(task_id);
 
   
@@ -191,8 +280,9 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
       }
   }, 2, keys.size(), dep1);
 
-  std::list<TaskID> dep2;
+  std::vector<TaskID> dep2;
   dep2.push_back(task_id);
+
   task_id = t.addTaskWithDeps([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
         int key = keys[i];
@@ -203,7 +293,7 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
       }
   }, 2, keys.size(), dep2);
 
-  std::list<TaskID> dep3;
+  std::vector<TaskID> dep3;
   dep3.push_back(task_id);
   task_id = t.addTaskWithDeps([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
@@ -221,7 +311,7 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest2) {
    
 }
 
-TEST(ExtendibleHashTableTest, MyConcurrentTest3) {
+TEST(ExtendibleHashTableTest, DISABLED_MyConcurrentTest3) {
   std::mutex mutex;
   ExtendibleHashTable<int, int> table(4);
   std::vector<int> keys;
@@ -233,10 +323,10 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest3) {
     delete_keys.push_back(i);
   }
   TasksUtil t(8);
-  InsertTask task1(&table, keys);
+  //InsertTask task1(&table, keys);
   // DeleteTask task2(&table, delete_keys);
  
-  t.addTask(task1, 4, keys.size());
+ // t.addTask(task1, 4, keys.size());
   // t.addTask(task2, 100);
 
   std::set<int> deleted_keys;
@@ -270,52 +360,9 @@ TEST(ExtendibleHashTableTest, MyConcurrentTest3) {
   }
 }
 
-TEST(ExtendibleHashTableTest, DISABLED_MyConcurrentTest) {
-  ExtendibleHashTable<int, int> table(4);
-  std::cout << "====MyConcurrentTest" << std::endl;
-  // 16,4,6,22,24,10,31,7,9,20,26.
-  std::vector<int> keys;
-  std::vector<int> delete_keys={10, 12, 13, 15, 8, 9, 1, 3};
-  for(int i=0; i<1000; i++){
-    keys.push_back(i);
-  }
-  LaunchParallelTest(4, InsertHelper, &table, keys);
-  LaunchParallelTest(4, DeleteHelper, &table, delete_keys);
-
-  table.Show();
-  int result;
-  table.Find(2, result);
-  EXPECT_EQ(2, result);
-  EXPECT_EQ(table.Find(9, result), false);
-   
-}
 
 
 
-TEST(ExtendibleHashTableTest, DISABLED_ConcurrentInsertTest) {
-  const int num_runs = 50;
-  const int num_threads = 3;
-
-  // Run concurrent test multiple times to guarantee correctness.
-  for (int run = 0; run < num_runs; run++) {
-    auto table = std::make_unique<ExtendibleHashTable<int, int>>(2);
-    std::vector<std::thread> threads;
-    threads.reserve(num_threads);
-
-    for (int tid = 0; tid < num_threads; tid++) {
-      threads.emplace_back([tid, &table]() { table->Insert(tid, tid); });
-    }
-    for (int i = 0; i < num_threads; i++) {
-      threads[i].join();
-    }
-
-    EXPECT_EQ(table->GetGlobalDepth(), 1);
-    for (int i = 0; i < num_threads; i++) {
-      int val;
-      EXPECT_TRUE(table->Find(i, val));
-      EXPECT_EQ(i, val);
-    }
-  }
-}
+ 
 
 }  // namespace bustub

@@ -95,7 +95,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * @param key The key to be inserted.
    * @param value The value to be inserted.
    */
-  void Insert(const K &key, const V &value) override;
+  auto Insert(const K &key, const V &value) -> bool override;
 
   /**
    *
@@ -112,6 +112,9 @@ class ExtendibleHashTable : public HashTable<K, V> {
     return size_;
   }
   void Show();
+  auto Check() -> bool;
+
+  auto IndexOf(const K &key) -> size_t;
 
 
  private:
@@ -204,7 +207,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
    * @param key The key to be hashed.
    * @return The entry index in the directory.
    */
-  auto IndexOf(const K &key) -> size_t;
+  // auto IndexOf(const K &key) -> size_t;
 
   // auto GetGlobalDepthInternal() const -> int;
   // auto GetLocalDepthInternal(int dir_index) const -> int;

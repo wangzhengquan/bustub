@@ -291,7 +291,7 @@ TEST(BPlusTreeTests, InsertOnDescent_DeleteOnAscent_Degree5_Test) {
     if(suc) {
       // std::cout << " ---- insert ----" << key << std::endl;
       keys.push_back(key);
-      std::ostringstream out;
+      // std::ostringstream out;
       // out << "output1-1/tree " << key << ".dot";
       // tree.Draw(bpm, out.str());
       // tree.Print(bpm);

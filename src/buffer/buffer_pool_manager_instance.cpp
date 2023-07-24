@@ -112,16 +112,12 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   }
   
 
-  // free_list_latch_.WLock();
   if (!free_list_.empty()) {
     frame_id = free_list_.front();
- // std::cout << "FetchPgImp pop frame_id=" << frame_id << std::endl;
     free_list_.pop_front();
     page = &pages_[frame_id];
     page->WLatch();
-    // free_list_latch_.WUnlock();
   } else {
-    // free_list_latch_.WUnlock();
 
     // evict
     frame_id = Victim();

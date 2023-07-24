@@ -20,13 +20,14 @@
 
 #include "common/logger.h"
 #include "container/hash/extendible_hash_table.h"
+#include "container/hash/hash_function.h"
 #include "storage/page/page.h"
 
 namespace bustub {
 
 template <typename K, typename V>
 ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
-    : global_depth_(0), bucket_size_(bucket_size), num_buckets_(1) {
+    : global_depth_(0), bucket_size_(bucket_size), num_buckets_(1 << global_depth_) {
   dir_.resize(num_buckets_);
   for (int i = 0; i < num_buckets_; i++) {
     dir_[i] = std::make_shared<Bucket>(bucket_size_, global_depth_);
@@ -85,52 +86,56 @@ auto ExtendibleHashTable<K, V>::Remove(const K &key) -> bool {
 }
 
 template <typename K, typename V>
-void ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) {
+auto ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) -> bool{
   std::unique_lock<std::shared_mutex> lock(mutex_);
-  int old_num_buckets_ = num_buckets_;
-  // std::cout << "insert(" << key <<"," << value << ")"<< std::endl;
-  size_t bucket_index = IndexOf(key);
-  std::shared_ptr<Bucket> bucket = dir_[bucket_index];
-  if (bucket->IsFull()) {
+  
+  std::shared_ptr<Bucket> bucket = dir_[IndexOf(key)];
+  while (bucket->IsFull()) {
     // extend dir
     if (bucket->GetDepth() == global_depth_) {
-      int high_bit = 1 << global_depth_;
-      num_buckets_ *= 2;
-      global_depth_++;
-      dir_.resize(num_buckets_);
-      for (int i = 0; i < old_num_buckets_; i++) {
-        // LOG_DEBUG("%d, %d, %d, %d\n", i, high_bit, i + high_bit, num_buckets_);
-        dir_[i + high_bit] = dir_[i];
+      // int high_bit = 1 << global_depth_;
+      dir_.resize(num_buckets_ << 1);
+      for (int i = 0; i < num_buckets_; i++) {
+        // LOG_DEBUG("i = %d, high_bit = %d, i + high_bit = %d, num_buckets_ = %d\n", i, high_bit, i + high_bit, num_buckets_);
+        dir_[i + num_buckets_] = dir_[i];
       }
+      num_buckets_ <<= 1;
+      global_depth_++;
     }
 
+   
     // split bucket
     std::shared_ptr<Bucket> bucket0 = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth() + 1);
     std::shared_ptr<Bucket> bucket1 = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth() + 1);
-    int local_hight_bit = 1 << (bucket->GetDepth());
+    int local_hight_bit_mask = 1 << (bucket->GetDepth());
     // split the bucket into two bucket according to the (bucket->GetDepth()+1)'th bit of the hash value of the node's key 
     for(Node *node = bucket->list_; node != nullptr; node = node->next){
-      std::shared_ptr<Bucket> new_buket = (std::hash<K>()(node->value.first) & local_hight_bit) == 0 ? bucket0 : bucket1;
-      new_buket->InsertOrAssign(node->value.first, node->value.second);
-    }
+      // size_t
+// std::cout << node->value.first << " , hash  = " << std::bitset<32>(std::hash<K>()(node->value.first)) 
+//  << ", local_hight_bit="<< (std::hash<K>()(node->value.first) & local_hight_bit_mask) << std::endl;
+
+      std::shared_ptr<Bucket> new_bucket = (std::hash<K>()(node->value.first) & local_hight_bit_mask) == 0 ? bucket0 : bucket1;
+      new_bucket->InsertOrAssign(node->value.first, node->value.second);
+    } 
 
     /* 
      * All of the dir items whose index  has the same low 'bucket->GetDepth()' bits with 'bucket_index' points to the same bucket,
      * All of them should be split into two buckets base on the (bucket->GetDepth()+1)'th bit of their corresponding index.
      */
-    // int i = std::hash<K>()(key) & (local_hight_bit - 1)
-    for (int i = bucket_index & (local_hight_bit - 1); i < num_buckets_; i += local_hight_bit) {
+    ;
+    for (int i = std::hash<K>()(key) & (local_hight_bit_mask - 1); i < num_buckets_; i += local_hight_bit_mask) {
       // if bucket->GetDepth()'th bit of the i is 0 set dir_[i] points to bucket0, else to bucket1;
-      dir_[i] = (i & local_hight_bit) == 0 ? bucket0 : bucket1;
+      dir_[i] = (i & local_hight_bit_mask) == 0 ? bucket0 : bucket1;
     }
-  }
 
-  bucket_index = IndexOf(key);
-  bucket = dir_[bucket_index];
+    bucket = dir_[IndexOf(key)];
+  }
+  
   auto [node, is_insert] = bucket->InsertOrAssign(key, value);
   if(is_insert){
     size_++;
   }
+  return true;
       
 }
 
@@ -141,15 +146,44 @@ void ExtendibleHashTable<K, V>::Show() {
   for (int i = 0; i < num_buckets_; i++) {
     std::shared_ptr<Bucket> bucket = dir_[i];
     std::bitset<32> bits(i);
-    std::cout << bits << "(depth=" << bucket->GetDepth() << ")" << " : ";
-              
+    if(!bucket){
+       std::cout << i << ") : null" << std::endl;
+       continue;
+    }
+    std::cout << i << ") " << bits << "(depth=" << bucket->GetDepth() << ")" << " : ";
+         
     for(Node *node = bucket->list_; node != nullptr; node = node->next){
       // std::cout << "(" << node->value.first << ", " << node->value.second << ") ";
-       std::cout << "(" << node->value.first  << ") ";
+       std::cout << "(" << node->value.first << ", " << std::bitset<32>(std::hash<K>()(node->value.first)) << ") ";
     }
     std::cout << std::endl;
   }
   std::cout << "--------------------------------------" << std::endl;
+}
+
+template <typename K, typename V>
+auto ExtendibleHashTable<K, V>::Check() -> bool{
+  int suc = true;
+  for (int i = 0; i < num_buckets_; i++) {
+    std::shared_ptr<Bucket> bucket = dir_[i];
+    if(!bucket){
+      LOG_ERROR("bucket  %d is null. ", i);
+      suc = false;
+      continue;
+    }
+    int mask = (1 << (bucket->GetDepth())) - 1;   
+    // int pre = -1;  
+    for(Node *node = bucket->list_; node != nullptr; node = node->next){
+      // std::cout << "(" << node->value.first << ", " << node->value.second << ") ";
+      int keybit = std::hash<K>()(node->value.first ) & mask;
+      if(keybit != (i & mask)){
+        suc = false;
+        std::cout << "keybit , i=" << i << ", key=" << node->value.first << std::endl;
+        // LOG_ERROR("keybit of %d:  ", i, );
+      }
+    }
+  }
+  return suc;
 }
 
 //===--------------------------------------------------------------------===//
@@ -223,18 +257,15 @@ auto ExtendibleHashTable<K, V>::Bucket::InsertOrAssign(const K &key, const V &va
       return {node, false};
     }
   }
-  if (!IsFull()) {
-    Node * node = new Node({key, value}, list_);
-    if(list_ != nullptr){
-      list_->pre = node;
-    }
-    
-    list_ = node;
-    size_++;
-    return {node, true};
+  BUSTUB_ASSERT(!IsFull(), "Bucket is full");
+  Node * node = new Node({key, value}, list_);
+  if(list_ != nullptr){
+    list_->pre = node;
   }
-
-  return {nullptr, false};
+  
+  list_ = node;
+  size_++;
+  return {node, true};
 }
 
 template class ExtendibleHashTable<page_id_t, Page *>;
