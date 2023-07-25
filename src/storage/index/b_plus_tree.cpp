@@ -53,16 +53,13 @@ INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
   std::list<BPlusTreePage *> locked_list;
 
-// std::cout << "GetValue " << key << std::endl;
   auto *leaf_page = Find(key, Operation::FIND, locked_list);
   if (leaf_page == nullptr) {
     UnlockPageList(locked_list, false, Operation::FIND);
     return false;
   }
-// std::cout << "GetValue pageid = " << leaf_page->GetPageId() << std::endl;
   int i = leaf_page->IndexOfKey(key, comparator_);
   if (i == -1) {
-// Print(bpm_);
     UnlockPageList(locked_list, false, Operation::FIND);
     return false;
   } else {
@@ -921,7 +918,7 @@ void BPLUSTREE_TYPE::ToString(BPlusTreePage *page, BufferPoolManager *bpm) const
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Check() const -> bool{
+auto BPLUSTREE_TYPE::Check()  -> bool{
   
   if (IsEmpty()) {
     LOG_WARN("Check an empty tree");
@@ -945,7 +942,7 @@ auto BPLUSTREE_TYPE::Check() const -> bool{
 
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Check_(BPlusTreePage *page) const -> bool{
+auto BPLUSTREE_TYPE::Check_(BPlusTreePage *page)  -> bool{
   bool suc = true;
   if (page->IsLeafPage()) {
     auto *leaf = reinterpret_cast<LeafPage *>(page);

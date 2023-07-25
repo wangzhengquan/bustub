@@ -58,10 +58,55 @@ public:
         suc = false;
       }
 
-      // EXPECT_EQ(rids.size(), 1);
+    }
+    
+    return suc;
+  }
 
-      // int64_t value = key & 0xFFFFFFFF;
-      // EXPECT_EQ(rids[0].GetSlotNum(), value);
+};
+
+
+class DeleteSucCheck{
+  
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> &tree;
+  std::set<int>& keys;
+  std::set<int>& keys_deleted;
+
+public:
+  DeleteSucCheck( BPlusTree<GenericKey<8>, RID, GenericComparator<8>>  &tree_, std::set<int>& keys_, std::set<int>& keys_deleted_):
+   tree(tree_), keys(keys_), keys_deleted(keys_deleted_){
+
+  }
+  bool operator() () {
+    bool suc = true;
+    GenericKey<8> index_key;
+    std::vector<RID> rids;
+    for (int key : keys) {
+      rids.clear();
+      index_key.SetFromInteger(key);
+      bool exist = tree.GetValue(index_key, &rids);
+      if(keys_deleted.find(key) == keys_deleted.end()){
+        // not deleted
+        if(!exist){
+          std::cout << "expect find not deleted" << key << " but not" << std::endl;
+          suc = false;
+          continue;
+        }
+
+        int value = rids[0].GetSlotNum();
+        if(value != key){
+          std::cout << "value "<< value << "don't equals " << key  << std::endl;
+          suc = false;
+        }
+
+      } else{
+        // deleted
+        if(exist){
+          std::cout << "expect deleted " << key << " but not" << std::endl;
+          suc = false;
+        }
+      }
+      
     }
     
     return suc;
@@ -458,82 +503,16 @@ TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentInsert1) {
 }
 
 
-TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentDelete) {
-  // create KeyComparator and index schema
+ 
+
+//DISABLED_
+TEST(BPlusTreeConcurrentTest, DISABLED_ConcurrentRandomInsert) {
+
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
   size_t pool_size = 100;
-  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
-  // create and fetch header_page
-  page_id_t page_id;
-  auto header_page = bpm->NewPage(&page_id);
-  (void)header_page;
-  // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
-
-  int64_t num = 100;
-  std::vector<int64_t> keys;
-  for (int64_t i = 0; i < num; i++) {
-    keys.push_back(i);
-  }
-  LaunchParallelTest(4, InsertHelper, &tree, keys);
-
-  std::vector<int64_t> remove_keys;
-  for (int64_t i = 0; i < num; i++) {
-    if(i % 2 == 0){
-      remove_keys.push_back(i);
-    }
-  }
-  LaunchParallelTest(4, DeleteHelper, &tree, remove_keys);
-
-  EXPECT_EQ(tree.Check(), true);
-  // tree.Print(bpm);
-  tree.Draw(bpm, "tree-concurrent-delete.dot");
-
-  int64_t size = 0;
-  GenericKey<8> pre ;
-  pre.SetFromInteger(-1);
-  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-    auto & cur = iterator->first;
-    EXPECT_GT(comparator(cur, pre), 0);
-    std::cout << cur << " ";
-    pre = cur;
-    ++size;
-  }
-  std::cout << "\nsize = " << size << std::endl;
-  EXPECT_EQ(size, keys.size() - remove_keys.size());
-
- 
-
-  // bpm->Print();
-  bpm->UnpinPage(HEADER_PAGE_ID, true);
-  
-  Page* frames = bpm->GetFrames();
-  for(size_t i = 0; i < pool_size; i++) {
-    Page &frame = frames[i];
-    EXPECT_EQ(frame.GetPinCount(), 0);
-    if(frame.GetPinCount() != 0)
-      std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
-  }
-
-
-
-  delete disk_manager;
-  delete bpm;
-  remove("test.db");
-  remove("test.log");
-}
-
-
-TEST(BPlusTreeConcurrentTest, DISABLED_temp) {
-
-  auto key_schema = ParseCreateStatement("a bigint");
-  GenericComparator<8> comparator(key_schema.get());
-
-  auto *disk_manager = new DiskManager("test.db");
-  size_t pool_size = 20;
   BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
   // create and fetch header_page
   page_id_t page_id;
@@ -547,75 +526,39 @@ TEST(BPlusTreeConcurrentTest, DISABLED_temp) {
 
   TasksUtil t(8);
 
-  // int scale = 4;
+  int scale = 10000;
 
-  // std::vector<int> keys_inserted;
-  // std::vector<int> keys_removed;
-  // std::srand(std::time(nullptr));
+  std::srand(std::time(nullptr));
 
-  // fs::remove_all("output");
-  // fs::create_directory("output");
+  fs::remove_all("output");
+  fs::create_directory("output");
 
-  // std::set<int> keys_set;
-  // for(int i = 0; i < scale; i++){
-  //   int key = std::rand() % scale;
-  //   keys_set.insert(key);
-  // }
-
-  // std::cout <<  "keys = ";
-  std::set<int> keys;
-  // for(int key : keys_set){
-  //   std::cout << key << " ";
-  //   keys.push_back(key);
-  // }
-  // std::cout << std::endl;
-
-  // TaskID task_id = 
-  // t.addTask([&](size_t from, size_t to){
-  //     for (size_t i = from; i < to; i++) {
-  //       int key = keys[i];
-  //       rid.Set(key, key);
-  //       index_key.SetFromInteger(key);
-        
-  //       if(tree.Insert(index_key, rid, transaction)){
-  //         console_mutex.lock();
-  //         printf("insert %d\n", key);
-  //         // std::cout << "insert " << key << std::endl;
-  //         console_mutex.unlock();
-  //       }
-
-  //     }
-        
-  // }, 4, keys.size());
   
-  // TaskID task_id = 
-  for (size_t i = 3; i > 0; i--) {
-    int key = i;
-    GenericKey<8> index_key;
-    RID rid;
-    rid.Set(key, key);
-    index_key.SetFromInteger(key);
-    
-    if(tree.Insert(index_key, rid, transaction)){
-      // std::ostringstream out;
-      // out << "output/tree-" << key << ".dot";
-      console_mutex.lock();
-      // tree.Draw(bpm, out.str());
-      printf("insert %d\n", key);
-      keys.insert(key);
-      // if(!tree.Check()){
-      //   console_mutex.unlock();
-      //   break;
-      // }
-      // std::cout << "insert " << key << std::endl;
-      console_mutex.unlock();
-    }
+  std::set<int> keys;
+   
+  
+  // insert
+  t.addTask([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = std::rand() % scale;
+        GenericKey<8> index_key;
+        RID rid;
+        rid.Set(key, key);
+        index_key.SetFromInteger(key);
+        
+        if(tree.Insert(index_key, rid, transaction)){
+          console_mutex.lock();
+          keys.insert(key);
+          console_mutex.unlock();
+        }
 
-  }
-
-
+      }
+        
+  }, 4, scale);
   
   t.run();
+
+  // ========== check =======================================
 
   std::cout << "inserted keys:";
   for(int key : keys){
@@ -623,18 +566,10 @@ TEST(BPlusTreeConcurrentTest, DISABLED_temp) {
   }
   std::cout << std::endl;
 
-  tree.Print(bpm);
-  tree.Print(bpm);
-  tree.Draw(bpm, "tree2.dot");
-  std::cout << "-----after Draw----" << std::endl;
-  tree.Print(bpm);
+  tree.Draw(bpm, "output/tree.dot");
   EXPECT_EQ(tree.Check(), true);
-  std::cout << "-----after tree.Check()----" << std::endl;
-  tree.Print(bpm);
   EXPECT_EQ(InsertSucCheck(tree, keys)(), true);
-  std::cout << "-----after InsertSucCheck----" << std::endl;
-  tree.Print(bpm);
-  
+  // tree.Print(bpm);
    
 
   int size = 0;
@@ -651,7 +586,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_temp) {
   for(size_t i = 0; i < pool_size; i++) {
     Page &frame = frames[i];
     EXPECT_EQ(frame.GetPinCount(), 0);
-    // if(frame.GetPinCount() != 0)
+    if(frame.GetPinCount() != 0)
       std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
   }
 
@@ -663,7 +598,8 @@ TEST(BPlusTreeConcurrentTest, DISABLED_temp) {
    
 }
 
-TEST(BPlusTreeConcurrentTest, ConcurrentRandomInsert) {
+//DISABLED_
+TEST(BPlusTreeConcurrentTest, ConcurrentRandomDelete) {
 
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -683,92 +619,51 @@ TEST(BPlusTreeConcurrentTest, ConcurrentRandomInsert) {
 
   TasksUtil t(8);
 
-  int scale = 4;
+  int scale = 10000;
 
-  // std::vector<int> keys_inserted;
-  // std::vector<int> keys_removed;
   std::srand(std::time(nullptr));
 
   fs::remove_all("output");
   fs::create_directory("output");
 
-  // std::set<int> keys_set;
-  // for(int i = 0; i < scale; i++){
-  //   int key = std::rand() % scale;
-  //   keys_set.insert(key);
-  // }
+  std::set<int> keys_set;
+  for(int i = 0; i < scale; i++){
+    int key = std::rand() % scale;
+    keys_set.insert(key);
+  }
 
-  // std::cout <<  "keys = ";
-  std::set<int> keys;
-  // for(int key : keys_set){
-  //   std::cout << key << " ";
-  //   keys.push_back(key);
-  // }
-  // std::cout << std::endl;
-
-  // TaskID task_id = 
-  // t.addTask([&](size_t from, size_t to){
-  //     for (size_t i = from; i < to; i++) {
-  //       int key = keys[i];
-  //       rid.Set(key, key);
-  //       index_key.SetFromInteger(key);
-        
-  //       if(tree.Insert(index_key, rid, transaction)){
-  //         console_mutex.lock();
-  //         printf("insert %d\n", key);
-  //         // std::cout << "insert " << key << std::endl;
-  //         console_mutex.unlock();
-  //       }
-
-  //     }
-        
-  // }, 4, keys.size());
+  std::vector<int> keys;
+  for(int key : keys_set){
+    keys.push_back(key);
+  }
   
-  // TaskID task_id = 
   t.addTask([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
-        int key = std::rand() % scale;
+        int key = keys[i];
         GenericKey<8> index_key;
         RID rid;
         rid.Set(key, key);
         index_key.SetFromInteger(key);
         
-        if(tree.Insert(index_key, rid, transaction)){
-          // std::ostringstream out;
-          // out << "output/tree-" << key << ".dot";
-          console_mutex.lock();
-          // tree.Draw(bpm, out.str());
-          printf("insert %d\n", key);
-          keys.insert(key);
-          // if(!tree.Check()){
-          //   console_mutex.unlock();
-          //   break;
-          // }
-          // std::cout << "insert " << key << std::endl;
-          console_mutex.unlock();
-        }
-
+        EXPECT_EQ(tree.Insert(index_key, rid, transaction), true);
       }
         
-  }, 4, scale);
-
-
+  }, 4, keys.size());
   
   t.run();
 
-  std::cout << "inserted keys:";
-  for(int key : keys){
-    std::cout << key << " ";
-  }
-  std::cout << std::endl;
+  // ========== check =======================================
 
-  // tree.Draw(bpm, "output/tree.dot");
-  // EXPECT_EQ(tree.Check(), true);
+  // std::cout << "inserted keys:";
+  // for(int key : keys){
+  //   std::cout << key << " ";
+  // }
+  // std::cout << std::endl;
 
-  tree.Print(bpm);
-  EXPECT_EQ(InsertSucCheck(tree, keys)(), true);
-  std::cout << "-----after check----" << std::endl;
-  tree.Print(bpm);
+  tree.Draw(bpm, "output/tree.dot");
+  EXPECT_EQ(tree.Check(), true);
+  EXPECT_EQ(InsertSucCheck(tree, keys_set)(), true);
+  // tree.Print(bpm);
    
 
   int size = 0;
@@ -777,7 +672,149 @@ TEST(BPlusTreeConcurrentTest, ConcurrentRandomInsert) {
   }
   std::cout << "\nsize = " << size << std::endl;
   EXPECT_EQ(size, keys.size());
+
+
+  // ================delete ===================================
+
+  std::set<int> keys_deleted;
+  t.addTask([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = std::rand() % scale;;
+        GenericKey<8> index_key;
+        index_key.SetFromInteger(key);
+        if(tree.Remove(index_key, transaction)){
+          console_mutex.lock();
+          keys_deleted.insert(key);
+          console_mutex.unlock();
+        }
+      }
+        
+  }, 4, scale);
+
+  // t.addTask([&](size_t from, size_t to){
+  //     for (size_t i = from; i < to; i++) {
+  //       if(i%2 == 0){
+  //         continue;
+  //       }
+  //       int key = keys[i];
+  //       GenericKey<8> index_key;
+  //       index_key.SetFromInteger(key);
+  //       EXPECT_EQ(tree.Remove(index_key, transaction), true);
+
+  //       console_mutex.lock();
+  //       keys_deleted.insert(key);
+  //       console_mutex.unlock();
+  //     }
+        
+  // }, 4, keys.size());
+
+  t.run();
+
+  // ========== check =========================================
+
+  tree.Draw(bpm, "output/tree2.dot");
+  EXPECT_EQ(tree.Check(), true);
+  EXPECT_EQ(DeleteSucCheck(tree, keys_set, keys_deleted)(), true);
+   
+
+  size = 0;
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+    ++size;
+  }
+  std::cout << "\nsize = " << size << std::endl;
+  EXPECT_EQ(size, keys_set.size() - keys_deleted.size());
+
   
+  // ============== end ===========================================
+  bpm->UnpinPage(HEADER_PAGE_ID, true);
+
+  Page* frames = bpm->GetFrames();
+  for(size_t i = 0; i < pool_size; i++) {
+    Page &frame = frames[i];
+    EXPECT_EQ(frame.GetPinCount(), 0);
+    if(frame.GetPinCount() != 0)
+      std::cout << "frame_id: " << i << ", page_id: " <<  frame.GetPageId() << ", pin_count: " << frame.GetPinCount() << std::endl;
+  }
+
+  delete transaction;
+  delete disk_manager;
+  delete bpm;
+  remove("test.db");
+  remove("test.log");
+   
+}
+
+//DISABLED_
+
+TEST(BPlusTreeConcurrentTest, ConcurrentRandomInsertAndDelete) {
+
+  auto key_schema = ParseCreateStatement("a bigint");
+  GenericComparator<8> comparator(key_schema.get());
+
+  auto *disk_manager = new DiskManager("test.db");
+  size_t pool_size = 1000;
+  BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
+  // create and fetch header_page
+  page_id_t page_id;
+  auto header_page = bpm->NewPage(&page_id);
+  (void)header_page;
+  // create b+ tree
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
+  
+  // create transaction
+  auto *transaction = new Transaction(0);
+
+  TasksUtil t(8);
+
+  int scale = 10000;
+
+  std::srand(std::time(nullptr));
+
+  fs::remove_all("output");
+  fs::create_directory("output");
+
+   
+  // insert
+  t.addTask([&](size_t from, size_t to){
+      for (size_t i = from; i < to; i++) {
+        int key = std::rand() % scale;
+        GenericKey<8> index_key;
+        RID rid;
+        rid.Set(key, key);
+        index_key.SetFromInteger(key);
+        
+        tree.Insert(index_key, rid, transaction);
+      }
+        
+  }, 4, scale);
+
+  // delete
+  // t.addTask([&](size_t from, size_t to){
+  //     for (size_t i = from; i < to; i++) {
+  //       int key = std::rand() % scale;
+  //       GenericKey<8> index_key;
+  //       index_key.SetFromInteger(key);
+  //       tree.Remove(index_key, transaction);
+  //     }
+        
+  // }, 4, scale);
+  
+  t.run();
+
+
+  // ========== check ===============
+  tree.Draw(bpm, "output/tree.dot");
+  EXPECT_EQ(tree.Check(), true);
+  // tree.Print(bpm);
+   
+
+  int size = 0;
+  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
+    ++size;
+  }
+  std::cout << "\nsize = " << size << std::endl;
+  // EXPECT_EQ(size, keys.size());
+
 
   bpm->UnpinPage(HEADER_PAGE_ID, true);
 
