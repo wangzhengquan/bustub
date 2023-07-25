@@ -80,11 +80,14 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetAt(int index, const KeyType &key, const Valu
 
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_LEAF_PAGE_TYPE::IndexOfKey(const KeyType &key, const KeyComparator &comparator) const -> int {
+// std::cout << "key: " << key  << " page " << page_id_ << " : ";
   for (int i = 0, size = GetSize(); i < size; i++) {
+// std::cout << array_[i].first << " ";
     if (comparator(key, array_[i].first) == 0) {
       return i;
     }
   }
+  std::cout << std::endl;
   return -1;
 }
 
@@ -98,7 +101,6 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &val
     -> int {
   BUSTUB_ASSERT(size_ < GetMaxSize(), "out of range");
   int i;
-  // for( i = 0; i < size_ && comparator(key, array_[i].first) > 0; i++) ;
   for (i = GetSize(); i > 0 && comparator(key, array_[i - 1].first) == -1; i--)
     ;
   InsertAt({key, value}, i);

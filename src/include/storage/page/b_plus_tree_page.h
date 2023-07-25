@@ -73,8 +73,8 @@ class BPlusTreePage {
   lsn_t lsn_;
   int size_;
   int max_size_;
-  page_id_t parent_page_id_;
-  page_id_t page_id_;
+  page_id_t parent_page_id_=-1;
+  page_id_t page_id_=-1;
   // mutable std::shared_mutex mutex_;
   ReaderWriterLatch latch_;
 };

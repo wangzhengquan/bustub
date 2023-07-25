@@ -33,20 +33,14 @@ class IndexIterator {
 
   auto IsEnd() -> bool;
 
-  auto operator*() -> const MappingType &;
-  auto operator->() -> const MappingType *;
+  auto operator*() ->  MappingType &;
+  auto operator->() ->  MappingType *;
   // Prefix increment
   auto operator++() -> IndexIterator &;
   // Postfix increment
   auto operator++(int) -> IndexIterator;
 
-  auto operator==(const IndexIterator &other) const -> bool {
-    if(leaf_page_ == nullptr || other.leaf_page_ == nullptr){
-       
-      return leaf_page_ == other.leaf_page_ ;
-    }
-    return leaf_page_->GetPageId() == other.leaf_page_->GetPageId() && index_ == other.index_;
-  }
+  auto operator==(const IndexIterator &other) const -> bool ;
 
   auto operator!=(const IndexIterator &itr) const -> bool { return !(itr == *this); }
 

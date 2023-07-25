@@ -73,7 +73,7 @@ class BPlusTree {
   // draw the B+ tree
   void Draw(BufferPoolManager *bpm, const std::string &outf);
 
-  auto Check() -> bool ;
+  auto Check() const ->  bool ;
 
   // read data from file and insert one by one
   void InsertFromFile(const std::string &file_name, Transaction *transaction = nullptr);
@@ -85,7 +85,7 @@ class BPlusTree {
   void UpdateRootPageId(int insert_record = 0);
   void UnlockPageList(std::list<BPlusTreePage *> &locked_list, bool dirty, const Operation op);
   // void PrintLockedPageList(std::list<BPlusTreePage *> &locked_list);
-  auto Check_(BPlusTreePage *page) -> bool ;
+  auto Check_(BPlusTreePage *page) const -> bool ;
   /**
    * @insert find for insert
    */

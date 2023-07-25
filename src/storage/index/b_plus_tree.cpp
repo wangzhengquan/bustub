@@ -52,14 +52,17 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result, Transaction *transaction) -> bool {
   std::list<BPlusTreePage *> locked_list;
+
+// std::cout << "GetValue " << key << std::endl;
   auto *leaf_page = Find(key, Operation::FIND, locked_list);
   if (leaf_page == nullptr) {
     UnlockPageList(locked_list, false, Operation::FIND);
     return false;
   }
-
+// std::cout << "GetValue pageid = " << leaf_page->GetPageId() << std::endl;
   int i = leaf_page->IndexOfKey(key, comparator_);
   if (i == -1) {
+// Print(bpm_);
     UnlockPageList(locked_list, false, Operation::FIND);
     return false;
   } else {
@@ -781,26 +784,12 @@ void BPLUSTREE_TYPE::Print(BufferPoolManager *bpm) {
     LOG_WARN("Print an empty tree");
     return;
   }
+  std::cout << "-------------tree-------------------" << std::endl;
   ToString(reinterpret_cast<BPlusTreePage *>(bpm->FetchPage(root_page_id_)->GetData()), bpm);
+  std::cout << "------------------------------------" << std::endl;
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Check()  -> bool{
-  // std::list<BPlusTreePage *> locked_list;
-  // new_root_page_->latch_.RLock();
-  // locked_list->push_back(new_root_page_);
-  if (IsEmpty()) {
-    LOG_WARN("Check an empty tree");
-    // UnlockPageList(&locked_list, false, Operation::FIND);
-    return true;
-  }
-  BPlusTreePage * root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
-  // root_page->latch_.RLock();
-  // locked_list->push_back(root_page);
-  bool suc =  Check_(root_page);
-  // UnlockPageList(&locked_list, false, Operation::FIND);
-  return suc;
-}
+
 
 
 /**
@@ -907,18 +896,20 @@ INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::ToString(BPlusTreePage *page, BufferPoolManager *bpm) const {
   if (page->IsLeafPage()) {
     auto *leaf = reinterpret_cast<LeafPage *>(page);
-    std::cout << "Leaf Page: " << leaf->GetPageId() << " parent: " << leaf->GetParentPageId()
-              << " next: " << leaf->GetNextPageId() << std::endl;
+    std::cout << "Leaf Page: " << leaf->GetPageId() << ", parent: " << leaf->GetParentPageId()
+              << ", next: " << leaf->GetNextPageId() << std::endl;
+    std::cout << "keys: " ;
     for (int i = 0; i < leaf->GetSize(); i++) {
-      std::cout << leaf->KeyAt(i) << ",";
+      std::cout << leaf->KeyAt(i) << " ";
     }
     std::cout << std::endl;
     std::cout << std::endl;
   } else {
     auto *internal = reinterpret_cast<InternalPage *>(page);
-    std::cout << "Internal Page: " << internal->GetPageId() << " parent: " << internal->GetParentPageId() << std::endl;
+    std::cout << "Internal Page: " << internal->GetPageId() << ", parent: " << internal->GetParentPageId() << std::endl;
+    std::cout << "keys: ";
     for (int i = 0; i < internal->GetSize(); i++) {
-      std::cout << internal->KeyAt(i) << ": " << internal->ValueAt(i) << ",";
+      std::cout << "(" << internal->KeyAt(i) << ", " << internal->ValueAt(i) << ") ";
     }
     std::cout << std::endl;
     std::cout << std::endl;
@@ -929,10 +920,32 @@ void BPLUSTREE_TYPE::ToString(BPlusTreePage *page, BufferPoolManager *bpm) const
   bpm->UnpinPage(page->GetPageId(), false);
 }
 
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::Check() const -> bool{
+  
+  if (IsEmpty()) {
+    LOG_WARN("Check an empty tree");
+    return true;
+  }
+  BPlusTreePage * root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
+  bool suc = Check_(root_page);
+
+  auto iterator = Begin();
+  auto pre_key = iterator->first;
+  for (++iterator; iterator != End(); ++iterator) {
+    auto & cur_key = iterator->first;
+    if(comparator_(pre_key, cur_key ) >=0 ){
+      std::cout << "leaf page list order error, "<< pre_key << " " << cur_key << std::endl;
+      suc = false;
+    }
+    pre_key = cur_key;
+  }
+  return suc;
+}
 
 
 INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::Check_(BPlusTreePage *page) -> bool{
+auto BPLUSTREE_TYPE::Check_(BPlusTreePage *page) const -> bool{
   bool suc = true;
   if (page->IsLeafPage()) {
     auto *leaf = reinterpret_cast<LeafPage *>(page);

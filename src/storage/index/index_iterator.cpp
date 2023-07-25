@@ -31,10 +31,19 @@ auto INDEXITERATOR_TYPE::IsEnd() -> bool {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::operator*() -> const MappingType & { return leaf_page_->At(index_); }
+auto INDEXITERATOR_TYPE::operator==(const IndexIterator &other) const -> bool {
+  if(leaf_page_ == nullptr || other.leaf_page_ == nullptr){
+     
+    return leaf_page_ == other.leaf_page_ ;
+  }
+  return leaf_page_->GetPageId() == other.leaf_page_->GetPageId() && index_ == other.index_;
+}
 
 INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::operator->() -> const MappingType * { return &(leaf_page_->At(index_)); }
+auto INDEXITERATOR_TYPE::operator*() ->  MappingType & { return leaf_page_->At(index_); }
+
+INDEX_TEMPLATE_ARGUMENTS
+auto INDEXITERATOR_TYPE::operator->() ->  MappingType * { return &(leaf_page_->At(index_)); }
 
 // Prefix increment
 INDEX_TEMPLATE_ARGUMENTS

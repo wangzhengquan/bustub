@@ -404,7 +404,7 @@ TEST(BPlusTreeTests, DeleteInterleave_Test) {
       ASSERT_EQ(tree.Remove(index_key, transaction), true);
       // std::cout << "---remove--- " << key << std::endl;
       ++num_remove_keys;
-      std::ostringstream out;
+      // std::ostringstream out;
       // out << "output2-2/tree " << key << ".dot";
       // tree.Draw(bpm, out.str());
       ASSERT_EQ(tree.Check(), true);
