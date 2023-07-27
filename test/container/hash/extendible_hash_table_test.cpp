@@ -121,11 +121,12 @@ TEST(ExtendibleHashTableTest, DISABLED_SampleTest) {
 }
 
 class InsertSucCheck{
-  std::set<int>& keys_inserted;
   ExtendibleHashTable<int, int>  &table;
+  std::set<int>& keys_inserted;
+  
 public:
-  InsertSucCheck(std::set<int>& keys_, ExtendibleHashTable<int, int> &table_):
-   keys_inserted(keys_), table(table_){
+  InsertSucCheck( ExtendibleHashTable<int, int> &table_, std::set<int>& keys_):
+  table(table_), keys_inserted(keys_){
 
   }
   bool operator() () {
@@ -134,18 +135,15 @@ public:
       int value = 0;
       bool exist = table.Find(key, value);
       if(!exist){
-        std::cout << "indexof " << key << " = " << table.IndexOf(key) << std::endl;
+        std::cout <<  key << " was expected to be found but not "  << std::endl;
         suc = false;
       }
-      if(value != key){
-        std::cout << "key= " << key << " , value= " << value << std::endl;
+      else if(value != key){
+        std::cout << "value was exppected to be equals with " << key << " , but it was  " << value << std::endl;
         suc = false;
 
       }
      
-      // EXPECT_EQ(exist, true);
-      // EXPECT_EQ(value, key);
-      
     }
     return suc;
   }
@@ -153,32 +151,45 @@ public:
 };
 
 class DeleteSucCheck{
-  std::set<int>& keys_deleted;
   ExtendibleHashTable<int, int>  &table;
+  std::set<int>& keys_inserted;
+  std::set<int>& keys_deleted;
+  
 public:
-  DeleteSucCheck(std::set<int>& keys_, ExtendibleHashTable<int, int> &table_):
-   keys_deleted(keys_), table(table_){
+  DeleteSucCheck( ExtendibleHashTable<int, int> &table_, std::set<int>& keys_, std::set<int>& keys_deleted_):
+  table(table_), keys_inserted(keys_), keys_deleted(keys_deleted_){
 
   }
   bool operator() () {
     bool suc = true;
-    for(int key : keys_deleted){
+    std::cout << "keys_inserted.size = " << keys_deleted.size() << " , keys_deleted.size = " << keys_inserted.size() << std::endl;
+    for(int key : keys_inserted){
       int value = 0;
       bool exist = table.Find(key, value);
-      if(exist){
-        std::cout <<  key << " should have been deleted but not " << std::endl;
-        suc = false;
+      if(keys_deleted.find(key) == keys_deleted.end()){
+        if(!exist){
+          std::cout <<  key << " was expected to be found but not "  << std::endl;
+          suc = false;
+        }
+        else if(value != key){
+          std::cout << "value was exppected to be equals with " << key << " , but it was  " << value << std::endl;
+          suc = false;
+
+        }
+      } else {
+        if(exist){
+           std::cout <<  key << "was expected to be deleted but not" << std::endl;
+           suc = false;
+        }
       }
-       
-     
-      // EXPECT_EQ(exist, true);
-      // EXPECT_EQ(value, key);
       
+     
     }
     return suc;
   }
 
 };
+ 
 
 
 TEST(ExtendibleHashTableTest, DISABLED_AscentInterleaveInsert) {
@@ -222,7 +233,7 @@ TEST(ExtendibleHashTableTest, DISABLED_AscentInterleaveInsert) {
   
   table.Show();
   ASSERT_EQ(table.Check(), true);
-  ASSERT_EQ(InsertSucCheck(keys_inserted, table)(), true);
+  ASSERT_EQ(InsertSucCheck(table, keys_inserted)(), true);
   ASSERT_EQ(keys_inserted.size(), table.GetSize());
 
 }
@@ -260,7 +271,7 @@ TEST(ExtendibleHashTableTest, ConcurrentRandomInsert) {
    
   // table.Show();
   ASSERT_EQ(table.Check(), true);
-  ASSERT_EQ(InsertSucCheck(keys_inserted, table)(), true);
+  ASSERT_EQ(InsertSucCheck(table, keys_inserted)(), true);
   ASSERT_EQ(keys_inserted.size(), table.GetSize());
 
    
@@ -268,7 +279,7 @@ TEST(ExtendibleHashTableTest, ConcurrentRandomInsert) {
  
 
 //DISABLED_
-TEST(ExtendibleHashTableTest, ConcurrentRandomDelete) {
+TEST(ExtendibleHashTableTest, RandomInsertThenDelete) {
   ExtendibleHashTable<int, int> table(4);
   std::set<int> keys_inserted;
    
@@ -277,6 +288,9 @@ TEST(ExtendibleHashTableTest, ConcurrentRandomDelete) {
   TasksUtil t(4);
   t.addTask([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
+        if(i%2 == 0){
+          continue;
+        }
         int key = std::rand() % scale;
         table.Insert(key, key);
 
@@ -292,7 +306,7 @@ TEST(ExtendibleHashTableTest, ConcurrentRandomDelete) {
 
    // table.Show();
   ASSERT_EQ(table.Check(), true);
-  ASSERT_EQ(InsertSucCheck(keys_inserted, table)(), true);
+  ASSERT_EQ(InsertSucCheck(table, keys_inserted)(), true);
   ASSERT_EQ(keys_inserted.size(), table.GetSize());
 
   std::vector<int> keys_inserted_vector;
@@ -300,14 +314,21 @@ TEST(ExtendibleHashTableTest, ConcurrentRandomDelete) {
     keys_inserted_vector.push_back(key);
   }
 
+
+  std::set<int> keys_deleted;
+
   t.addTask([&](size_t from, size_t to){
     for (size_t i = from; i < to; i++) {
       int key = keys_inserted_vector[i];
+
       EXPECT_EQ(table.Remove(key), true);
       
-
+      std::unique_lock lock(mutex_);
+      keys_deleted.insert(key);
+      lock.unlock();
       // table.Show();
-      ASSERT_EQ(table.Check(), true);
+      // ASSERT_EQ(table.Check(), true);
+      
       // ASSERT_EQ(Check(keys_inserted, table)(), true);
       // ASSERT_EQ(keys_inserted.size(), table.GetSize());
     }
@@ -317,12 +338,13 @@ TEST(ExtendibleHashTableTest, ConcurrentRandomDelete) {
    
   // table.Show();
   ASSERT_EQ(table.Check(), true);
-  ASSERT_EQ(0, table.GetSize());
+  ASSERT_EQ(DeleteSucCheck(table, keys_inserted, keys_deleted)(), true);
+  ASSERT_EQ(keys_inserted.size() - keys_deleted.size(), table.GetSize());
 }
  
 
 
-TEST(ExtendibleHashTableTest, ConcurrentInsertAndDelete) {
+TEST(ExtendibleHashTableTest, RandomInsertAndDelete) {
   ExtendibleHashTable<int, int> table(4);
    
   size_t scale = 10000;

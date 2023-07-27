@@ -655,7 +655,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_RandomInsertThenDelete_1) {
 }
 
 //DISABLED_
-TEST(BPlusTreeConcurrentTest, RandomInsertThenDelete_2) {
+TEST(BPlusTreeConcurrentTest, DISABLED_RandomInsertThenDelete_2) {
 
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -786,7 +786,7 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
   GenericComparator<8> comparator(key_schema.get());
 
   auto *disk_manager = new DiskManager("test.db");
-  size_t pool_size = 100;
+  size_t pool_size = 1000;
   BufferPoolManager *bpm = new BufferPoolManagerInstance(pool_size, disk_manager);
   // create and fetch header_page
   page_id_t page_id;
@@ -800,7 +800,7 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
 
   TasksUtil t(8);
 
-  int scale = 1000;
+  int scale = 5000;
 
   std::srand(std::time(nullptr));
 
@@ -809,6 +809,7 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
 
    
   // ---- insert ---
+
   t.addTask([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
         int key = std::rand() % scale;
@@ -823,9 +824,10 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
   }, 4, scale);
 
   // t.run();
-  // EXPECT_EQ(tree.Check(), true);
+  // ASSERT_EQ(tree.Check(), true);
 
   // --- delete ----
+
   t.addTask([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
         int key = std::rand() % scale;

@@ -47,24 +47,8 @@ class ExtendibleHashTable : public HashTable<K, V> {
    */
   explicit ExtendibleHashTable(size_t bucket_size);
 
-  /**
-   * @brief Get the global depth of the directory.
-   * @return The global depth of the directory.
-   */
-  auto GetGlobalDepth() const -> int;
-
-  /**
-   * @brief Get the local depth of the bucket that the given directory index points to.
-   * @param dir_index The index in the directory.
-   * @return The local depth of the bucket.
-   */
-  auto GetLocalDepth(int dir_index) const -> int;
-
-  /**
-   * @brief Get the number of buckets in the directory.
-   * @return The number of buckets in the directory.
-   */
-  auto GetNumBuckets() const -> int;
+ 
+  
 
   /**
    *
@@ -99,8 +83,6 @@ class ExtendibleHashTable : public HashTable<K, V> {
 
   /**
    *
-   * TODO(P1): Add implementation
-   *
    * @brief Given the key, remove the corresponding key-value pair in the hash table.
    * Shrink & Combination is not required for this project
    * @param key The key to be deleted.
@@ -111,9 +93,31 @@ class ExtendibleHashTable : public HashTable<K, V> {
   auto GetSize() -> size_t {
     return size_;
   }
+
+
+  // ==========for test============
+   /**
+   * @brief Get the global depth of the directory.
+   * @return The global depth of the directory.
+   */
+  auto GetGlobalDepth() const -> size_t;
+
+  /**
+   * @brief Get the local depth of the bucket that the given directory index points to.
+   * @param dir_index The index in the directory.
+   * @return The local depth of the bucket.
+   */
+  auto GetLocalDepth(size_t dir_index) const -> size_t;
+
   void Show();
   auto Check() -> bool;
 
+
+  /**
+   * @brief For the given key, return the entry index in the directory where the key hashes to.
+   * @param key The key to be hashed.
+   * @return The entry index in the directory.
+   */
   auto IndexOf(const K &key) -> size_t;
 
 
@@ -131,7 +135,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
   class Bucket {
    public:
     friend class ExtendibleHashTable;
-    explicit Bucket(size_t capcity, int depth = 0);
+    explicit Bucket(size_t capcity, size_t depth = 0);
     ~Bucket();
 
 
@@ -139,7 +143,7 @@ class ExtendibleHashTable : public HashTable<K, V> {
     inline auto IsFull() const -> bool { return size_ >= capcity_; }
 
     /** @brief Get the local depth of the bucket. */
-    inline auto GetDepth() const -> int { return depth_; }
+    inline auto GetDepth() const -> size_t { return depth_; }
 
     /** @brief Increment the local depth of a bucket. */
     inline void IncrementDepth() { depth_++; }
@@ -178,40 +182,18 @@ class ExtendibleHashTable : public HashTable<K, V> {
 
     const size_t capcity_;
     size_t size_ = 0;
-    int depth_;
+    size_t depth_;
     Node *list_ = nullptr;
   };
-  // TODO(student): You may add additional private members and helper functions and remove the ones
-  // you don't need.
 
-  int global_depth_;    // The global depth of the directory
-  size_t bucket_size_;  // The size of a bucket
-  int num_buckets_;     // The number of buckets in the hash table
+  size_t global_depth_;    // The global depth of the directory
+  size_t bucket_capcity_;  // The size of a bucket
+  size_t num_buckets_;     // The number of buckets in the hash table
   mutable std::shared_mutex mutex_;
   std::vector<std::shared_ptr<Bucket>> dir_;  // The directory of the hash table
   size_t size_ = 0;
-  // The following functions are completely optional, you can delete them if you have your own ideas.
+  
 
-  /**
-   * @brief Redistribute the kv pairs in a full bucket.
-   * @param bucket The bucket to be redistributed.
-   */
-  auto RedistributeBucket(std::shared_ptr<Bucket> bucket) -> void;
-
-  /*****************************************************************
-   * Must acquire latch_ first before calling the below functions. *
-   *****************************************************************/
-
-  /**
-   * @brief For the given key, return the entry index in the directory where the key hashes to.
-   * @param key The key to be hashed.
-   * @return The entry index in the directory.
-   */
-  // auto IndexOf(const K &key) -> size_t;
-
-  // auto GetGlobalDepthInternal() const -> int;
-  // auto GetLocalDepthInternal(int dir_index) const -> int;
-  // auto GetNumBucketsInternal() const -> int;
 };
  
 

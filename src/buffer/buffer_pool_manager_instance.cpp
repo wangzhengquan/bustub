@@ -140,6 +140,7 @@ auto BufferPoolManagerInstance::FetchPgImp(page_id_t page_id) -> Page * {
   
   page_table_->Insert(page_id, frame_id);
   lock.unlock();
+  
   page->pin_count_ = 0;
   page->ClearAccessHistory();
 
@@ -267,7 +268,9 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
 }
 
 
-auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { return next_page_id_++; }
+auto BufferPoolManagerInstance::AllocatePage() -> page_id_t { 
+  return next_page_id_++; 
+}
 
  
 

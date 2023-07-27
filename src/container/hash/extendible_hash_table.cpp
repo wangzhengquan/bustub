@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <functional>
 #include <list>
+#include <set>
 #include <utility>
 
 #include "common/logger.h"
@@ -26,37 +27,34 @@
 namespace bustub {
 
 template <typename K, typename V>
-ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_size)
-    : global_depth_(0), bucket_size_(bucket_size), num_buckets_(1 << global_depth_) {
+ExtendibleHashTable<K, V>::ExtendibleHashTable(size_t bucket_capcity)
+    : global_depth_(0), bucket_capcity_(bucket_capcity), num_buckets_(1 << global_depth_) {
   dir_.resize(num_buckets_);
-  for (int i = 0; i < num_buckets_; i++) {
-    dir_[i] = std::make_shared<Bucket>(bucket_size_, global_depth_);
+  for (size_t i = 0; i < num_buckets_; i++) {
+    dir_[i] = std::make_shared<Bucket>(bucket_capcity_, global_depth_);
   }
 }
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::IndexOf(const K &key) -> size_t {
-  int mask = (1 << global_depth_) - 1;
+  size_t mask = (1 << global_depth_) - 1;
   return std::hash<K>()(key) & mask;
 }
 
 template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::GetGlobalDepth() const -> int {
-  std::shared_lock<std::shared_mutex> lock(mutex_);
+auto ExtendibleHashTable<K, V>::GetGlobalDepth() const -> size_t {
   return global_depth_;
 }
 
 template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::GetLocalDepth(int dir_index) const -> int {
-  std::shared_lock<std::shared_mutex> lock(mutex_);
+auto ExtendibleHashTable<K, V>::GetLocalDepth(size_t dir_index) const -> size_t {
   return dir_[dir_index]->GetDepth();
 }
 
-template <typename K, typename V>
-auto ExtendibleHashTable<K, V>::GetNumBuckets() const -> int {
-  std::shared_lock<std::shared_mutex> lock(mutex_);
-  return num_buckets_;
-}
+// template <typename K, typename V>
+// auto ExtendibleHashTable<K, V>::GetNumBuckets() const -> size_t {
+//   return num_buckets_;
+// }
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Find(const K &key, V &value) -> bool {
@@ -95,7 +93,7 @@ auto ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) -> bool{
     if (bucket->GetDepth() == global_depth_) {
       // int high_bit = 1 << global_depth_;
       dir_.resize(num_buckets_ << 1);
-      for (int i = 0; i < num_buckets_; i++) {
+      for (size_t i = 0; i < num_buckets_; i++) {
         // LOG_DEBUG("i = %d, high_bit = %d, i + high_bit = %d, num_buckets_ = %d\n", i, high_bit, i + high_bit, num_buckets_);
         dir_[i + num_buckets_] = dir_[i];
       }
@@ -105,9 +103,9 @@ auto ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) -> bool{
 
    
     // split bucket
-    std::shared_ptr<Bucket> bucket0 = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth() + 1);
-    std::shared_ptr<Bucket> bucket1 = std::make_shared<Bucket>(bucket_size_, bucket->GetDepth() + 1);
-    int local_hight_bit_mask = 1 << (bucket->GetDepth());
+    std::shared_ptr<Bucket> bucket0 = std::make_shared<Bucket>(bucket_capcity_, bucket->GetDepth() + 1);
+    std::shared_ptr<Bucket> bucket1 = std::make_shared<Bucket>(bucket_capcity_, bucket->GetDepth() + 1);
+    size_t local_hight_bit_mask = 1 << (bucket->GetDepth());
     // split the bucket into two bucket according to the (bucket->GetDepth()+1)'th bit of the hash value of the node's key 
     for(Node *node = bucket->list_; node != nullptr; node = node->next){
       // size_t
@@ -123,7 +121,7 @@ auto ExtendibleHashTable<K, V>::Insert(const K &key, const V &value) -> bool{
      * All of them should be split into two buckets base on the (bucket->GetDepth()+1)'th bit of their corresponding index.
      */
     ;
-    for (int i = std::hash<K>()(key) & (local_hight_bit_mask - 1); i < num_buckets_; i += local_hight_bit_mask) {
+    for (size_t i = std::hash<K>()(key) & (local_hight_bit_mask - 1); i < num_buckets_; i += local_hight_bit_mask) {
       // if bucket->GetDepth()'th bit of the i is 0 set dir_[i] points to bucket0, else to bucket1;
       dir_[i] = (i & local_hight_bit_mask) == 0 ? bucket0 : bucket1;
     }
@@ -143,7 +141,7 @@ template <typename K, typename V>
 void ExtendibleHashTable<K, V>::Show() {
   std::cout << "---------- Table Structure -----------" << std::endl;
   std::cout << "Gloable depth = " << global_depth_ << std::endl;
-  for (int i = 0; i < num_buckets_; i++) {
+  for (size_t i = 0; i < num_buckets_; i++) {
     std::shared_ptr<Bucket> bucket = dir_[i];
     std::bitset<32> bits(i);
     if(!bucket){
@@ -163,26 +161,43 @@ void ExtendibleHashTable<K, V>::Show() {
 
 template <typename K, typename V>
 auto ExtendibleHashTable<K, V>::Check() -> bool{
-  int suc = true;
-  for (int i = 0; i < num_buckets_; i++) {
+  bool suc = true;
+  std::set<size_t> dir_index_set;
+  for (size_t i = 0; i < num_buckets_; i++) {
     std::shared_ptr<Bucket> bucket = dir_[i];
     if(!bucket){
-      LOG_ERROR("bucket  %d is null. ", i);
+      LOG_ERROR("bucket  %lu is null. ", i);
       suc = false;
       continue;
     }
-    int mask = (1 << (bucket->GetDepth())) - 1;   
+    size_t local_hight_bit = 1 << (bucket->GetDepth());
+    size_t mask = local_hight_bit - 1;   
     // int pre = -1;  
     for(Node *node = bucket->list_; node != nullptr; node = node->next){
       // std::cout << "(" << node->value.first << ", " << node->value.second << ") ";
-      int keybit = std::hash<K>()(node->value.first ) & mask;
-      if(keybit != (i & mask)){
-        suc = false;
+      size_t key_bits = std::hash<K>()(node->value.first ) & mask;
+      if(key_bits != (i & mask)){
+        
         std::cout << "keybit , i=" << i << ", key=" << node->value.first << std::endl;
-        // LOG_ERROR("keybit of %d:  ", i, );
+        suc = false;
       }
     }
+
+    
+    if(dir_index_set.find(i) == dir_index_set.end()){
+      dir_index_set.insert(i);
+      for(size_t j = i + local_hight_bit; j <  num_buckets_; j += local_hight_bit){
+        dir_index_set.insert(j);
+        if(dir_[j] != bucket){
+          std::cout << "dir " << j << "should point to the same bucket as dir" << i << "but it's not" << std::endl;
+          suc = false;
+        }
+      }
+    }
+
   }
+  BUSTUB_ASSERT(dir_index_set.size() == static_cast<size_t>(num_buckets_) , 
+    "dir_index_set.size() =%lu, num_buckets_ =%lu", dir_index_set.size(), num_buckets_);
   return suc;
 }
 
@@ -190,7 +205,7 @@ auto ExtendibleHashTable<K, V>::Check() -> bool{
 // Bucket
 //===--------------------------------------------------------------------===//
 template <typename K, typename V>
-ExtendibleHashTable<K, V>::Bucket::Bucket(size_t capcity, int depth) : capcity_(capcity), depth_(depth) {
+ExtendibleHashTable<K, V>::Bucket::Bucket(size_t capcity, size_t depth) : capcity_(capcity), depth_(depth) {
   // std::cout << "Bucket construct" << std::endl;
 }
 
