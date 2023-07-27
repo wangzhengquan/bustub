@@ -285,6 +285,7 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage *page, const KeyType &key, const ValueType &value) {
   InternalPage *parent_page = nullptr;
+  // Page * page_buf = nullptr;
   if (page->IsRootPage()) {
     page->Insert(key, value, comparator_);
   } else {
@@ -292,11 +293,14 @@ void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage *page, const KeyType &key, const 
     int indexOfPage = parent_page->IndexOfKey(key, comparator_);
     page->Insert(key, value, comparator_);
     parent_page->SetKeyAt(indexOfPage, page->KeyAt(0));
+    page_buf->SetDirty(true);
   }
   
 
   if (page->GetSize() < page->GetMaxSize()) {
-    if(parent_page != nullptr) bpm_->UnpinPage(parent_page->GetPageId(), true);
+    if(parent_page != nullptr) {
+      bpm_->UnpinPage(parent_page->GetPageId(), true);
+    }
     return;
   }
   // split

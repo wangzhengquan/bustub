@@ -97,9 +97,10 @@ class Page {
   /** Page latch. */
   ReaderWriterLatch rwlatch_;
 
-// for lru_k
+// ================= lru_k_replacer ======================
+private:
   std::list<size_t> access_histories_{};
-  size_t k_;
+  size_t k_ = 1;
   State state_ = State::NORMAL;
 
 public:
@@ -131,8 +132,8 @@ public:
     access_histories_.clear();
   }
 
-  void SetK(size_t k){
-    k_ = k;
+  void SetDirty(bool dirty){
+    is_dirty_ = dirty;
   }
 
   auto Removed() -> bool{

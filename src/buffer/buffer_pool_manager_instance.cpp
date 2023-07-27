@@ -27,7 +27,8 @@ BufferPoolManagerInstance::BufferPoolManagerInstance(size_t pool_size, DiskManag
 
   // Initially, every page is in the free list.
   for (size_t i = 0; i < pool_size_; ++i) {
-    free_list_.emplace_back(static_cast<int>(i));
+    pages_[i].k_ = replacer_k;
+    free_list_.emplace_back(static_cast<frame_id_t>(i));
   }
 
 }
