@@ -55,16 +55,16 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 
   auto *leaf_page = Find(key, Operation::FIND, locked_list);
   if (leaf_page == nullptr) {
-    UnlockPageList(locked_list, false, Operation::FIND);
+    ClearLockedPageList(locked_list, Operation::FIND);
     return false;
   }
   int i = leaf_page->IndexOfKey(key, comparator_);
   if (i == -1) {
-    UnlockPageList(locked_list, false, Operation::FIND);
+    ClearLockedPageList(locked_list, Operation::FIND);
     return false;
   } else {
     result->push_back(leaf_page->ValueAt(i));
-    UnlockPageList(locked_list, false, Operation::FIND);
+    ClearLockedPageList(locked_list, Operation::FIND);
     return true;
   }
 }
@@ -95,12 +95,12 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 //   cur_page = root_page;
 //   if (op == Operation::FIND) {
 //     cur_page->latch_.RLock();
-//     UnlockPageList(locked_list, false, op);
+//     ClearLockedPageList(locked_list, false, op);
 //     locked_list->push_back(cur_page);
 //   } else if (op == Operation::INSERT){
 //     cur_page->latch_.WLock();
 //     if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
-//       UnlockPageList(locked_list, false, op);
+//       ClearLockedPageList(locked_list, false, op);
 //     }
 //     locked_list->push_back(cur_page);
 //   } else if (op == Operation::REMOVE) {
@@ -118,20 +118,20 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 //     cur_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(cur_inter_page->ValueAt(i))->GetData());
 //     if (op == Operation::FIND) {
 //       cur_page->latch_.RLock();
-//       UnlockPageList(locked_list, false, op);
+//       ClearLockedPageList(locked_list, false, op);
 //       locked_list->push_back(cur_page);
 //     }
 //     else if (op == Operation::INSERT) {
 //       cur_page->latch_.WLock();
 //       if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
-//         UnlockPageList(locked_list, false, op);
+//         ClearLockedPageList(locked_list, false, op);
 //       }
       
 //       locked_list->push_back(cur_page);
 //     } else if (op == Operation::REMOVE) {
 //       cur_page->latch_.WLock();
 //       if (cur_page->GetSize() > cur_page->GetMinSize()) {
-//         UnlockPageList(locked_list, false, op);
+//         ClearLockedPageList(locked_list, false, op);
 //       }
 //       // 释放grandparent以前的锁
 //       locked_list->push_back(grandparent_page);
@@ -166,7 +166,7 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
   cur_page = root_page;
   if (op == Operation::FIND) {
     cur_page->latch_.RLock();
-    UnlockPageList(locked_list, false, op);
+    ClearLockedPageList(locked_list, op);
     locked_list.push_back(cur_page);
   }  else {
     cur_page->latch_.WLock();
@@ -183,14 +183,14 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
     cur_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(cur_inter_page->ValueAt(i))->GetData());
     if (op == Operation::FIND) {
       cur_page->latch_.RLock();
-      UnlockPageList(locked_list, false, op);
+      ClearLockedPageList(locked_list, op);
       locked_list.push_back(cur_page);
     }
     else if (op == Operation::INSERT) {
       cur_page->latch_.WLock();
       if (cur_page->GetSize() < cur_page->GetMaxSize() - 1) {
         // 释放parent以前的锁
-        UnlockPageList(locked_list, false, op);
+        ClearLockedPageList(locked_list, op);
       }
       
       locked_list.push_back(parent_page);
@@ -198,7 +198,7 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
       cur_page->latch_.WLock();
       if (cur_page->GetSize() > cur_page->GetMinSize()) {
          // 释放parent以前的锁
-        UnlockPageList(locked_list, false, op);
+        ClearLockedPageList(locked_list, op);
       }
      
       locked_list.push_back(parent_page);
@@ -216,8 +216,8 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
 }
  
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::UnlockPageList(std::list<BPlusTreePage *> &locked_list, bool dirty, const Operation op) {
-  // std::cout << "-------------- UnlockPageList -------------" << std::endl;
+void BPLUSTREE_TYPE::ClearLockedPageList(std::list<BPlusTreePage *> &locked_list, const Operation op) {
+  // std::cout << "-------------- ClearLockedPageList -------------" << std::endl;
    
 
   while (!locked_list.empty()) {
@@ -230,12 +230,20 @@ void BPLUSTREE_TYPE::UnlockPageList(std::list<BPlusTreePage *> &locked_list, boo
     }
     
     if(page != new_root_page_) {
-      bpm_->UnpinPage(page->GetPageId(), dirty);
+      bpm_->UnpinPage(page->GetPageId(), false);
     }
     locked_list.pop_front();
   }
 
 // std::cout << "\n------------------------------------------" << std::endl;
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void BPLUSTREE_TYPE::PopFromLockedPageList(std::list<BPlusTreePage *> &locked_list, bool dirty){
+  BPlusTreePage *page = locked_list.back();
+  page->latch_.WUnlock();
+  bpm_->UnpinPage(page->GetPageId(), dirty);
+  locked_list.pop_back();
 }
 
  
@@ -274,16 +282,16 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
 
   LeafPage *page = Find(key, Operation::INSERT, locked_list);
   if (page->IndexOfKey(key, comparator_) != -1) {
-    UnlockPageList(locked_list, false, Operation::INSERT);
+    ClearLockedPageList(locked_list, Operation::INSERT);
     return false;
   }
-  InsertInLeafPage(page, key, value);
-  UnlockPageList(locked_list, true, Operation::INSERT);
+  InsertInLeafPage(page, key, value, locked_list);
+  ClearLockedPageList(locked_list, Operation::INSERT);
   return true;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage *page, const KeyType &key, const ValueType &value) {
+void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage *page, const KeyType &key, const ValueType &value, std::list<BPlusTreePage *> &locked_list) {
   InternalPage *parent_page = nullptr;
   // Page * page_buf = nullptr;
   if (page->IsRootPage()) {
@@ -293,11 +301,11 @@ void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage *page, const KeyType &key, const 
     int indexOfPage = parent_page->IndexOfKey(key, comparator_);
     page->Insert(key, value, comparator_);
     parent_page->SetKeyAt(indexOfPage, page->KeyAt(0));
-    page_buf->SetDirty(true);
   }
   
 
   if (page->GetSize() < page->GetMaxSize()) {
+    PopFromLockedPageList(locked_list, true);
     if(parent_page != nullptr) {
       bpm_->UnpinPage(parent_page->GetPageId(), true);
     }
@@ -317,15 +325,19 @@ void BPLUSTREE_TYPE::InsertInLeafPage(LeafPage *page, const KeyType &key, const 
   page->SetNextPageId(page_r->GetPageId());
   if (page->IsRootPage()) {
     InsertInNewRoot(page->KeyAt(0), page, page_r->KeyAt(0), page_r);
+    PopFromLockedPageList(locked_list, true);
+    bpm_->UnpinPage(page_r->GetPageId(), true);
   } else {
-    InsertInInternalPage(parent_page, page_r->KeyAt(0), page_r_id);
+    PopFromLockedPageList(locked_list, true);
+    InsertInInternalPage(parent_page, page_r->KeyAt(0), page_r_id, locked_list);
     bpm_->UnpinPage(parent_page->GetPageId(), true);
+    bpm_->UnpinPage(page_r->GetPageId(), true);
   }
-  bpm_->UnpinPage(page_r->GetPageId(), true);
+ 
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InsertInInternalPage(InternalPage *page, const KeyType &key, const page_id_t &value) {
+void BPLUSTREE_TYPE::InsertInInternalPage(InternalPage *page, const KeyType &key, const page_id_t &value, std::list<BPlusTreePage *> &locked_list) {
   InternalPage *parent_page = nullptr;
   if (page->IsRootPage()) {
     page->Insert(key, value, comparator_);
@@ -337,7 +349,10 @@ void BPLUSTREE_TYPE::InsertInInternalPage(InternalPage *page, const KeyType &key
   }
 
   if (page->GetSize() < page->GetMaxSize()) {
-    if(parent_page != nullptr) bpm_->UnpinPage(parent_page->GetPageId(), true);
+    PopFromLockedPageList(locked_list, true);
+    if(parent_page != nullptr) {
+      bpm_->UnpinPage(parent_page->GetPageId(), true);
+    }
     return;
   }
   // split
@@ -355,18 +370,20 @@ void BPLUSTREE_TYPE::InsertInInternalPage(InternalPage *page, const KeyType &key
 
   if (page->IsRootPage()) {
     InsertInNewRoot(page->KeyAt(0), page, page_r->KeyAt(0), page_r);
+    PopFromLockedPageList(locked_list, true);
+    bpm_->UnpinPage(page_r->GetPageId(), true);
   } else {
-     
-    InsertInInternalPage(parent_page, page_r->KeyAt(0), page_r->GetPageId());
+    PopFromLockedPageList(locked_list, true);
+    InsertInInternalPage(parent_page, page_r->KeyAt(0), page_r->GetPageId(), locked_list);
     bpm_->UnpinPage(parent_page->GetPageId(), true);
+    bpm_->UnpinPage(page_r->GetPageId(), true);
   }
-  bpm_->UnpinPage(page_r->GetPageId(), true);
-  // page_r->latch_.WUnlock();
+  
 }
 
+// BPlusTreePage 没有KeyAt方法所以作为参数传进来免得再次转换。
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r,
-                                     BPlusTreePage *page_r) {
+void BPLUSTREE_TYPE::InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r) {
   page_id_t root_page_id;
   InternalPage *root_page = reinterpret_cast<InternalPage *>(bpm_->NewPage(&root_page_id)->GetData());
   root_page->Init(root_page_id, INVALID_PAGE_ID, internal_max_size_);
@@ -394,25 +411,26 @@ auto BPLUSTREE_TYPE::Remove(const KeyType &key, Transaction *transaction) -> boo
   std::list<BPlusTreePage *> locked_list;
   LeafPage *leaf_page = Find(key, Operation::REMOVE, locked_list);
   if (leaf_page == nullptr) {
-    UnlockPageList(locked_list, false, Operation::REMOVE );
+    ClearLockedPageList(locked_list, Operation::REMOVE );
     return false;
   }
 
   int i = leaf_page->IndexOfKey(key, comparator_);
   if (i == -1) {
-    UnlockPageList(locked_list, false, Operation::REMOVE);
+    ClearLockedPageList(locked_list, Operation::REMOVE);
     return false;
   }
-  RemoveInLeafPage(leaf_page, i, key);
-  UnlockPageList(locked_list, true, Operation::REMOVE);
+  RemoveInLeafPage(leaf_page, i, key, locked_list);
+  ClearLockedPageList(locked_list, Operation::REMOVE);
   return true;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType &key) {
+void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType &key, std::list<BPlusTreePage *> &locked_list) {
   LeafPage *l_page = nullptr, *r_page = nullptr;
   m_page->RemoveAt(index);
   if (m_page->IsRootPage()) {
+    PopFromLockedPageList(locked_list, true);
     return;
   }
   page_id_t parent_page_id = m_page->GetParentPageId();
@@ -422,6 +440,8 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
 
   if (m_page->GetSize() >= min) {
     parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
+    
+    PopFromLockedPageList(locked_list, true);
     bpm_->UnpinPage(parent_page_id, true);
     return;
   }
@@ -447,6 +467,7 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
       r_page->latch_.WUnlock();
       bpm_->UnpinPage(r_page->GetPageId(), false);
     }
+    PopFromLockedPageList(locked_list, true);
      
   } else if (r_page != nullptr && r_page->GetSize() > min) {
     // borrow from right
@@ -463,8 +484,9 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
     }
     r_page->latch_.WUnlock();
     bpm_->UnpinPage(r_page->GetPageId(), true);
+    PopFromLockedPageList(locked_list, true);
   } else {
-    // Coalesce
+    // Coalesce 
     if (l_page != nullptr) {
       l_page->Coalesce(m_page, comparator_,  true);
       l_page->SetNextPageId(m_page->GetNextPageId());
@@ -477,8 +499,10 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
         bpm_->UnpinPage(r_page->GetPageId(), false);
       }
 
-      RemoveInInternalPage(parent_page, indexOfMPage, key);
       bpm_->DeletePage(m_page->GetPageId());
+      PopFromLockedPageList(locked_list, false);
+      RemoveInInternalPage(parent_page, indexOfMPage, key, locked_list);
+
     } else if (r_page != nullptr) {
       // r_page->Coalesce(m_page, comparator_, false);
       // // if the original minest key was the one which is removed
@@ -496,7 +520,9 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
       r_page->latch_.WUnlock();
       bpm_->DeletePage(r_page->GetPageId());
       bpm_->UnpinPage(r_page->GetPageId(), false);
-      RemoveInInternalPage(parent_page, indexOfMPage + 1, key);
+
+      PopFromLockedPageList(locked_list, true);
+      RemoveInInternalPage(parent_page, indexOfMPage + 1, key, locked_list);
       
     }
   }
@@ -504,20 +530,23 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const KeyType &key) {
+void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const KeyType &key, std::list<BPlusTreePage *> &locked_list) {
   InternalPage *l_page = nullptr, *r_page = nullptr;
   m_page->RemoveAt(index);
   if (m_page->IsRootPage()) {
     if (m_page->GetSize() == 1) {
       page_id_t old_root_page_id = root_page_id_;
       root_page_id_ = m_page->ValueAt(0);
-      // bpm_->UnpinPage(old_root_page_id, false);
-      bpm_->DeletePage(old_root_page_id);
       BPlusTreePage *root_page = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(root_page_id_)->GetData());
       root_page->SetParentPageId(INVALID_PAGE_ID);
       UpdateRootPageId(0);
       bpm_->UnpinPage(root_page_id_, true);
+      bpm_->DeletePage(old_root_page_id);
+      PopFromLockedPageList(locked_list, false);
+    } else {
+      PopFromLockedPageList(locked_list, true);
     }
+    
     return;
   }
 
@@ -528,6 +557,8 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
 
   if (m_page->GetSize() >= min) {
     parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
+    
+    PopFromLockedPageList(locked_list, true);
     bpm_->UnpinPage(parent_page_id, true);
     return;
   }
@@ -554,6 +585,7 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
       r_page->latch_.WUnlock();
       bpm_->UnpinPage(r_page->GetPageId(), false);
     }
+    PopFromLockedPageList(locked_list, true);
       
   } else if (r_page != nullptr && r_page->GetSize() > min) {
     // borrow from right
@@ -570,6 +602,7 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
     }
     r_page->latch_.WUnlock();
     bpm_->UnpinPage(r_page->GetPageId(), true);
+    PopFromLockedPageList(locked_list, true);
   } else {
     // Coalesce
     if (l_page != nullptr) {
@@ -583,8 +616,10 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
         bpm_->UnpinPage(r_page->GetPageId(), false);
       }
 
-      RemoveInInternalPage(parent_page, indexOfMPage, key);
       bpm_->DeletePage(m_page->GetPageId());
+      PopFromLockedPageList(locked_list, false);
+      RemoveInInternalPage(parent_page, indexOfMPage, key, locked_list);
+     
     } else if (r_page != nullptr) {
       // SetParentOfChildrenInPageTo(m_page, r_page->GetPageId());
       // r_page->Coalesce(m_page, comparator_, false);
@@ -605,7 +640,8 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
       r_page->latch_.WUnlock();
       bpm_->DeletePage(r_page->GetPageId());
       bpm_->UnpinPage(r_page->GetPageId(), false);
-      RemoveInInternalPage(parent_page, indexOfMPage + 1, key);
+      PopFromLockedPageList(locked_list, true);
+      RemoveInInternalPage(parent_page, indexOfMPage + 1, key, locked_list);
       
     }
   }
@@ -669,7 +705,6 @@ auto BPLUSTREE_TYPE::Begin(const KeyType &key) -> INDEXITERATOR_TYPE {
   std::list<BPlusTreePage *> locked_list;
   auto *leaf_page = Find(key, Operation::FIND, locked_list);
   int i = leaf_page->IndexOfKey(key, comparator_);
-  // UnlockPageList(&locked_list, false, Operation::FIND);
 
   return INDEXITERATOR_TYPE(leaf_page, bpm_, i == -1 ? 0 : i);
 }

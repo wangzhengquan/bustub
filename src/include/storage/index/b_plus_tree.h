@@ -83,7 +83,8 @@ class BPlusTree {
 
  private:
   void UpdateRootPageId(int insert_record = 0);
-  void UnlockPageList(std::list<BPlusTreePage *> &locked_list, bool dirty, const Operation op);
+  void ClearLockedPageList(std::list<BPlusTreePage *> &locked_list, const Operation op);
+  void PopFromLockedPageList(std::list<BPlusTreePage *> &locked_list, bool dirty);
   // void PrintLockedPageList(std::list<BPlusTreePage *> &locked_list);
   auto Check_(BPlusTreePage *page)  -> bool ;
   /**
@@ -94,17 +95,17 @@ class BPlusTree {
   /**
    * Insert  {key, value} into LeafPage
    */
-  void InsertInLeafPage(LeafPage *page, const KeyType &key, const ValueType &value);
+  void InsertInLeafPage(LeafPage *page, const KeyType &key, const ValueType &value, std::list<BPlusTreePage *> &locked_list);
   /**
    * Insert  {key, value} into InternalPage
    */
-  void InsertInInternalPage(InternalPage *page, const KeyType &key, const page_id_t &value);
+  void InsertInInternalPage(InternalPage *page, const KeyType &key, const page_id_t &value, std::list<BPlusTreePage *> &locked_list);
   void InsertInNewRoot(const KeyType &key, BPlusTreePage *page, const KeyType &key_r, BPlusTreePage *page_r);
   /**
    * Remove the node at index in LeafPage
    */
-  void RemoveInLeafPage(LeafPage *page, int index, const KeyType &key);
-  void RemoveInInternalPage(InternalPage *page, int index, const KeyType &key);
+  void RemoveInLeafPage(LeafPage *page, int index, const KeyType &key, std::list<BPlusTreePage *> &locked_list);
+  void RemoveInInternalPage(InternalPage *page, int index, const KeyType &key,  std::list<BPlusTreePage *> &locked_list);
   /**
    * Change the parent id of all child nodes under this node to this node's id.
    * */
