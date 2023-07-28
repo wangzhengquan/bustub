@@ -148,7 +148,7 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
 
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreePage *> &locked_list) -> LeafPage * {
-  if (root_page_id_ == INVALID_PAGE_ID) return nullptr;
+  
 
   BPlusTreePage * parent_page = nullptr, * cur_page = nullptr;
   cur_page = new_root_page_;
@@ -158,6 +158,13 @@ auto BPLUSTREE_TYPE::Find(const KeyType &key, Operation op, std::list<BPlusTreeP
   }  else {
     cur_page->latch_.WLock();
   } 
+
+  if (root_page_id_ == INVALID_PAGE_ID) {
+    if (op != Operation::FIND){
+      locked_list.push_back(cur_page);
+    }
+    return nullptr;
+  }
 
   // grandparent_page = parent_page;
   parent_page = cur_page;
@@ -261,26 +268,40 @@ void BPLUSTREE_TYPE::PopFromLockedPageList(std::list<BPlusTreePage *> &locked_li
 INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) -> bool {
   // std::cout << "insert " << key << std::endl;
-  if (root_page_id_ == INVALID_PAGE_ID) {
-    new_root_page_->latch_.WLock();
-    if (root_page_id_ == INVALID_PAGE_ID) {
-      page_id_t root_page_id;
-      LeafPage *root_page = reinterpret_cast<LeafPage *>(bpm_->NewPage(&root_page_id)->GetData());
-      root_page->latch_.WLock();
-      root_page->Init(root_page_id, INVALID_PAGE_ID, leaf_max_size_);
-      root_page->SetNextPageId(INVALID_PAGE_ID);
-      root_page_id_ = root_page_id;
-      UpdateRootPageId(1);
-      root_page->latch_.WUnlock();
-      bpm_->UnpinPage(root_page_id, true);
-    }
-    new_root_page_->latch_.WUnlock();
-  } 
+  // if (root_page_id_ == INVALID_PAGE_ID) {
+  //   new_root_page_->latch_.WLock();
+  //   if (root_page_id_ == INVALID_PAGE_ID) {
+  //     page_id_t root_page_id;
+  //     LeafPage *root_page = reinterpret_cast<LeafPage *>(bpm_->NewPage(&root_page_id)->GetData());
+  //     root_page->latch_.WLock();
+  //     root_page->Init(root_page_id, INVALID_PAGE_ID, leaf_max_size_);
+  //     root_page->SetNextPageId(INVALID_PAGE_ID);
+  //     root_page_id_ = root_page_id;
+  //     UpdateRootPageId(1);
+  //     root_page->latch_.WUnlock();
+  //     bpm_->UnpinPage(root_page_id, true);
+  //   }
+  //   new_root_page_->latch_.WUnlock();
+  // } 
    
 
   std::list<BPlusTreePage *> locked_list;
 
   LeafPage *page = Find(key, Operation::INSERT, locked_list);
+  if(page == nullptr) {
+    // page_id_t root_page_id;
+    page = reinterpret_cast<LeafPage *>(bpm_->NewPage(&root_page_id_)->GetData());
+    // root_page->latch_.WLock();
+    page->Init(root_page_id_, INVALID_PAGE_ID, leaf_max_size_);
+    page->SetNextPageId(INVALID_PAGE_ID);
+    // root_page_id_ = root_page_id_;
+    UpdateRootPageId(1);
+    // root_page->latch_.WUnlock();
+    bpm_->UnpinPage(root_page_id_, true);
+    // ClearLockedPageList(locked_list, Operation::INSERT);
+    // return true;
+  }
+
   if (page->IndexOfKey(key, comparator_) != -1) {
     ClearLockedPageList(locked_list, Operation::INSERT);
     return false;

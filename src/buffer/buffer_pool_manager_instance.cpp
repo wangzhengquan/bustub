@@ -242,7 +242,7 @@ auto BufferPoolManagerInstance::FlushPgImp(page_id_t page_id) -> bool {
   Page &page = pages_[frame_id];
   page.WLatch();
   lock.unlock();
-  if(!page.Removed()){
+  if(!page.IsRemoved()){
     disk_manager_->WritePage(page.GetPageId(), page.GetData());
     page.is_dirty_ = false;
   }
@@ -254,14 +254,12 @@ void BufferPoolManagerInstance::FlushAllPgsImp() {
   for (size_t i = 0; i < pool_size_; i++) {
     Page &page = pages_[i];
     page.WLatch();
-    if (page.Removed()) {
+    if (page.IsRemoved()) {
       page.WUnlatch();
       continue;
     }
-    if(!page.Removed()){
-      disk_manager_->WritePage(page.GetPageId(), page.GetData());
-      page.is_dirty_ = false;
-    }
+    disk_manager_->WritePage(page.GetPageId(), page.GetData());
+    page.is_dirty_ = false;
     
     page.WUnlatch();
   }
@@ -282,7 +280,7 @@ auto BufferPoolManagerInstance::Victim() -> frame_id_t {
   for (size_t i = 0; i < pool_size_; i++) {
     Page& frame = pages_[i];
     frame.RLatch();
-    if(frame.Removed() || !frame.Evictable()){
+    if(frame.IsRemoved() || !frame.Evictable()){
       frame.RUnlatch();
       continue;
     }

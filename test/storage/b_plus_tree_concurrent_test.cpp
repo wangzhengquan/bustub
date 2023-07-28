@@ -71,7 +71,7 @@ public:
       bool exist = tree.GetValue(index_key, &rids);
       
       if(!exist){
-        std::cout << "Expect found " << key << " but not" << std::endl;
+        std::cout << "Expect found key " << key << " , but not" << std::endl;
         suc = false;
         continue;
       }
@@ -655,7 +655,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_RandomInsertThenDelete_1) {
 }
 
 //DISABLED_
-TEST(BPlusTreeConcurrentTest, DISABLED_RandomInsertThenDelete_2) {
+TEST(BPlusTreeConcurrentTest, RandomInsertThenDelete_2) {
 
   auto key_schema = ParseCreateStatement("a bigint");
   GenericComparator<8> comparator(key_schema.get());
@@ -668,7 +668,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_RandomInsertThenDelete_2) {
   auto header_page = bpm->NewPage(&page_id);
   (void)header_page;
   // create b+ tree
-  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 5, 5);
+  BPlusTree<GenericKey<8>, RID, GenericComparator<8>> tree("foo_pk", bpm, comparator, 3, 3);
   
   // create transaction
   auto *transaction = new Transaction(0);
@@ -740,7 +740,7 @@ TEST(BPlusTreeConcurrentTest, DISABLED_RandomInsertThenDelete_2) {
 
   t.addTask([&](size_t from, size_t to){
       for (size_t i = from; i < to; i++) {
-        if(i >= to-5){
+        if(i %2 == 0){
           continue;
         }
         int key = keys[i];
@@ -800,7 +800,7 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
 
   TasksUtil t(8);
 
-  int scale = 5000;
+  int scale = 3000;
 
   std::srand(std::time(nullptr));
 

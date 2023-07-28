@@ -136,13 +136,13 @@ public:
     is_dirty_ = dirty;
   }
 
-  auto Removed() -> bool{
+  auto IsRemoved() -> bool{
     return page_id_ == INVALID_PAGE_ID;;
   }
 
   auto Remove() -> bool{
     BUSTUB_ASSERT(Evictable(), "Remove a Un Evictable frame.");
-    if(Removed()) 
+    if(IsRemoved()) 
       return true;
     page_id_ = INVALID_PAGE_ID;
     state_ = State::NORMAL;
