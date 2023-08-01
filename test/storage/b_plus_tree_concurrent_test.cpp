@@ -800,7 +800,7 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
 
   TasksUtil t(8);
 
-  int scale = 3000;
+  int scale = 10000;
 
   std::srand(std::time(nullptr));
 

@@ -110,8 +110,9 @@ class BPlusTree {
    * Change the parent id of all child nodes under this node to this node's id.
    * */
   // void SetParentOfChildren(InternalPage *page);
-  void SetParentOfChildrenInPageTo(InternalPage *page, page_id_t parent_page_id);
-  void SetParentOfPageTo(page_id_t page_id, page_id_t parent_page_id) ;
+  void ChangeParentOfChildrenInPageTo(InternalPage *page, page_id_t parent_page_id);
+  void ChangeParentOfChildInPageTo(InternalPage *page, int i, page_id_t parent_page_id) ;
+  // void SetParentOfPageTo(page_id_t page_id, page_id_t parent_page_id) ;
 
   /* Debug Routines for FREE!! */
   void ToGraph(BPlusTreePage *page, BufferPoolManager *bpm, std::ofstream &out) const;
