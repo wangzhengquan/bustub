@@ -84,11 +84,8 @@ public:
 
     }
 
-    size_t size = 0;
-    for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-      ++size;
-    }
-
+    
+    size_t size = tree.GetSize();
     if(size != keys.size()){
       std::cout << "Tree's size should be  " << keys.size()  
         << " , but it was " << size << std::endl;
@@ -145,10 +142,7 @@ public:
       
     }
 
-    size_t size = 0;
-    for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-      ++size;
-    }
+    size_t size = tree.GetSize();
    
     if(size != keys.size() - keys_deleted.size()){
       std::cout << "tree's size should be " << keys.size() - keys_deleted.size() 
@@ -847,11 +841,8 @@ TEST(BPlusTreeConcurrentTest, RandomInsertAndDelete) {
   // tree.Print(bpm);
    
 
-  int size = 0;
-  for (auto iterator = tree.Begin(); iterator != tree.End(); ++iterator) {
-    ++size;
-  }
-  std::cout << "\nsize = " << size << std::endl;
+   
+  std::cout << "\nsize = " << tree.GetSize() << std::endl;
 
   // ======== end =======
 

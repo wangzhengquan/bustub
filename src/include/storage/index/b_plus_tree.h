@@ -66,6 +66,8 @@ class BPlusTree {
   auto Begin() -> INDEXITERATOR_TYPE;
   auto Begin(const KeyType &key) -> INDEXITERATOR_TYPE;
   auto End() -> INDEXITERATOR_TYPE;
+  auto GetSize() -> size_t;
+
 
   // print the B+ tree
   void Print(BufferPoolManager *bpm);
@@ -111,7 +113,13 @@ class BPlusTree {
    * */
   // void SetParentOfChildren(InternalPage *page);
   void ChangeParentOfChildrenInPageTo(InternalPage *page, page_id_t parent_page_id);
-  void ChangeParentOfChildInPageTo(InternalPage *page, int i, page_id_t parent_page_id) ;
+  inline void ChangeParentOfChildInPageTo(InternalPage *page, int i, page_id_t parent_page_id) {
+    BPlusTreePage *child = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(page->ValueAt(i))->GetData());
+   // child->latch_.WLock();
+    child->SetParentPageId(parent_page_id);
+    // child->latch_.WUnlock();
+    bpm_->UnpinPage(child->GetPageId(), true);
+  }
   // void SetParentOfPageTo(page_id_t page_id, page_id_t parent_page_id) ;
 
   /* Debug Routines for FREE!! */

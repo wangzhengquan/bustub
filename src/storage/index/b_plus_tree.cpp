@@ -344,10 +344,13 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
   int min = m_page->GetMinSize();
 
   if (m_page->GetSize() >= min) {
-    parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
-    
+    if(index == 0){
+      parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
+      bpm_->UnpinPage(parent_page_id, true);
+    } else {
+      bpm_->UnpinPage(parent_page_id, false);
+    }
     PopFromLockedPageList(locked_list, true);
-    bpm_->UnpinPage(parent_page_id, true);
     return;
   }
 
@@ -365,6 +368,7 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
     m_page->InsertAt(l_page->At(l_page->GetSize() - 1), 0);
     l_page->RemoveAt(l_page->GetSize() - 1);
     parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
+    bpm_->UnpinPage(parent_page_id, true);
 
     l_page->latch_.WUnlock();
     bpm_->UnpinPage(l_page->GetPageId(), true);
@@ -381,6 +385,7 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
     // if the original minest key was the one which is removed
     parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
     parent_page->SetKeyAt(indexOfMPage + 1, r_page->KeyAt(0));
+    bpm_->UnpinPage(parent_page_id, true);
 
     if(l_page != nullptr ) {
       l_page->latch_.WUnlock();
@@ -406,6 +411,7 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
       bpm_->DeletePage(m_page->GetPageId());
       PopFromLockedPageList(locked_list, false);
       RemoveInInternalPage(parent_page, indexOfMPage, key, locked_list);
+      bpm_->UnpinPage(parent_page_id, true);
 
     } else if (r_page != nullptr) {
       m_page->Coalesce(r_page, comparator_, true);
@@ -418,10 +424,10 @@ void BPLUSTREE_TYPE::RemoveInLeafPage(LeafPage *m_page, int index, const KeyType
 
       PopFromLockedPageList(locked_list, true);
       RemoveInInternalPage(parent_page, indexOfMPage + 1, key, locked_list);
-      
+      bpm_->UnpinPage(parent_page_id, true);
     }
   }
-  bpm_->UnpinPage(parent_page_id, true);
+  
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -451,10 +457,13 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
   int min = m_page->GetMinSize();
 
   if (m_page->GetSize() >= min) {
-    parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
-    
+    if(index == 0){
+      parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
+      bpm_->UnpinPage(parent_page_id, true);
+    } else {
+      bpm_->UnpinPage(parent_page_id, false);
+    }
     PopFromLockedPageList(locked_list, true);
-    bpm_->UnpinPage(parent_page_id, true);
     return;
   }
 
@@ -473,6 +482,7 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
     m_page->InsertAt(l_page->At(l_page->GetSize() - 1), 0);
     l_page->RemoveAt(l_page->GetSize() - 1);
     parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
+    bpm_->UnpinPage(parent_page_id, true);
 
     l_page->latch_.WUnlock();
     bpm_->UnpinPage(l_page->GetPageId(), true);
@@ -493,6 +503,7 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
     // if the original minest key was the one which is removed
     parent_page->SetKeyAt(indexOfMPage, m_page->KeyAt(0));
     parent_page->SetKeyAt(indexOfMPage + 1, r_page->KeyAt(0));
+    bpm_->UnpinPage(parent_page_id, true);
 
     if(l_page != nullptr ) {
       l_page->latch_.WUnlock();
@@ -517,6 +528,7 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
       bpm_->DeletePage(m_page->GetPageId());
       PopFromLockedPageList(locked_list, false);
       RemoveInInternalPage(parent_page, indexOfMPage, key, locked_list);
+      bpm_->UnpinPage(parent_page_id, true);
      
     } else if (r_page != nullptr) {
       // ChangeParentOfChildrenInPageTo(m_page, r_page->GetPageId());
@@ -540,10 +552,10 @@ void BPLUSTREE_TYPE::RemoveInInternalPage(InternalPage *m_page, int index, const
       bpm_->UnpinPage(r_page->GetPageId(), false);
       PopFromLockedPageList(locked_list, true);
       RemoveInInternalPage(parent_page, indexOfMPage + 1, key, locked_list);
+      bpm_->UnpinPage(parent_page_id, true);
       
     }
   }
-  bpm_->UnpinPage(parent_page_id, true);
 }
 
 
@@ -555,24 +567,7 @@ void BPLUSTREE_TYPE::ChangeParentOfChildrenInPageTo(InternalPage *page, page_id_
   }
 }
 
-INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::ChangeParentOfChildInPageTo(InternalPage *page, int i, page_id_t parent_page_id) {
-  BPlusTreePage *page_tmp = reinterpret_cast<BPlusTreePage *>(bpm_->FetchPage(page->ValueAt(i))->GetData());
-  page_tmp->latch_.WLock();
-  // if(page_tmp->IsLeafPage()){
-  //   LeafPage * leaf_page_tmp = (LeafPage *) page_tmp;
-  //   page->SetKeyAt(i, leaf_page_tmp->KeyAt(0));
-  //   // BUSTUB_ASSERT(comparator_(leaf_page_tmp->KeyAt(0), page->KeyAt(i)) == 0, "leaf_page_tmp->KeyAt(0) != page->KeyAt(%d) ", i);
-  // } else {
-  //   InternalPage * inter_page_tmp = (InternalPage *)page_tmp;
-  //   page->SetKeyAt(i, inter_page_tmp->KeyAt(0));
-  //   // BUSTUB_ASSERT(comparator_(inter_page_tmp->KeyAt(0), page->KeyAt(i)) == 0, "inter_page_tmp->KeyAt(0) != page->KeyAt(%d)", i);
-  // }
 
-  page_tmp->SetParentPageId(parent_page_id);
-  page_tmp->latch_.WUnlock();
-  bpm_->UnpinPage(page_tmp->GetPageId(), true);
-}
 
 /*****************************************************************************
  * INDEX ITERATOR
@@ -634,6 +629,15 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE {
     bpm_->UnpinPage(pre_page->GetPageId(), false);
   }
   return INDEXITERATOR_TYPE(static_cast<LeafPage *>(cur_page), bpm_, cur_page->GetSize());
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+auto BPLUSTREE_TYPE::GetSize() -> size_t{
+  size_t size = 0;
+  for (auto iterator = Begin(), end = End(); iterator != end; ++iterator) {
+    ++size;
+  }
+  return size;
 }
 
 /**
