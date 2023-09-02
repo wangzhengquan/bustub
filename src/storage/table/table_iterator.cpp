@@ -58,19 +58,19 @@ auto TableIterator::operator++() -> TableIterator & {
     }
   }
   tuple_->rid_ = next_tuple_rid;
+  cur_page->RUnlatch();
+  buffer_pool_manager->UnpinPage(cur_page->GetTablePageId(), false);
 
   if (*this != table_heap_->End()) {
     // DO NOT ACQUIRE READ LOCK twice in a single thread otherwise it may deadlock.
     // See https://users.rust-lang.org/t/how-bad-is-the-potential-deadlock-mentioned-in-rwlocks-document/67234
-    if (!table_heap_->GetTuple(tuple_->rid_, tuple_, txn_, false)) {
-      cur_page->RUnlatch();
-      buffer_pool_manager->UnpinPage(cur_page->GetTablePageId(), false);
+    if (!table_heap_->GetTuple(tuple_->rid_, tuple_, txn_, true)) {
+      
+      //buffer_pool_manager->UnpinPage(cur_page->GetTablePageId(), false);
       throw bustub::Exception("read non-existing tuple");
     }
   }
-  // release until copy the tuple
-  cur_page->RUnlatch();
-  buffer_pool_manager->UnpinPage(cur_page->GetTablePageId(), false);
+ 
   return *this;
 }
 

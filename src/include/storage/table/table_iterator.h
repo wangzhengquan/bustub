@@ -29,6 +29,7 @@ class TableIterator {
   friend class Cursor;
 
  public:
+  TableIterator() : tuple_(new Tuple(RID(INVALID_PAGE_ID, 0))){};
   TableIterator(TableHeap *table_heap, RID rid, Transaction *txn);
 
   TableIterator(const TableIterator &other)
