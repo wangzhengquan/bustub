@@ -102,6 +102,7 @@ private:
   std::list<size_t> access_histories_{};
   size_t k_ = 1;
   State state_ = State::NORMAL;
+  std::shared_mutex frame_mutex_;
 
 public:
   void RecordAccess(size_t timestamp) {
