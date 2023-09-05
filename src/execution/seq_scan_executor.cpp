@@ -18,19 +18,17 @@ SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNod
 
 void SeqScanExecutor::Init() {
  // throw NotImplementedException("SeqScanExecutor is not implemented"); 
- table_info_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid());
 
- cursor_ = table_info_->table_->Begin(exec_ctx_->GetTransaction());
+ cursor_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())->table_->Begin(exec_ctx_->GetTransaction());
 }
 
 auto SeqScanExecutor::Next(Tuple *tuple, RID *rid) -> bool { 
 
-	if(cursor_ == table_info_->table_->End())
+	if(cursor_ == exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())->table_->End())
 		return false; 
 	*tuple = *cursor_;
 	*rid = tuple->GetRid();
 	++cursor_;	
-	// std::cout << "----- next ---------" << std::endl;
 	return true;
 
 }
