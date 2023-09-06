@@ -181,8 +181,10 @@ auto BufferPoolManagerInstance::UnpinPgImp(page_id_t page_id, bool is_dirty) -> 
   if (page.pin_count_ < 0) {
     LOG_WARN("\n page.pin_count_ < 0 , pageid = %d, pin_count = %d", page.GetPageId(),  page.pin_count_ );
     // BUSTUB_ASSERT(false, "page.pin_count_ < 0");
-    return false;
-  } else if (page.pin_count_ == 0 && page.state_ ==  Page::State::WAITTING_TO_DELETE) {
+    // return false;
+  }  
+
+  if (page.pin_count_ <= 0 && page.state_ ==  Page::State::WAITTING_TO_DELETE) {
     // delete page
     // std::cout << "delete page " << page_id <<  std::endl;
     page_table_->Remove(page_id);

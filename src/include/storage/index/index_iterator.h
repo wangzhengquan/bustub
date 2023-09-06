@@ -28,7 +28,7 @@ class IndexIterator {
   // using pointer           = MappingType*;
   // using reference         = MappingType&;
   // you may define your own constructor based on your member variables
-  IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page=nullptr, BufferPoolManager *bpm=nullptr, int index = 0);
+  IndexIterator(B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page = nullptr, BufferPoolManager *bpm=nullptr, int index = 0);
   ~IndexIterator();  // NOLINT
 
   auto IsEnd() -> bool;
@@ -46,7 +46,7 @@ class IndexIterator {
 
  private:
   // add your own private member variables here
-  B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page_;
+  B_PLUS_TREE_LEAF_PAGE_TYPE *leaf_page_ = nullptr;
   BufferPoolManager *bpm_;
   int index_;
 };

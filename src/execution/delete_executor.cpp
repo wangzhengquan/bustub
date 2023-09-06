@@ -26,14 +26,19 @@ void DeleteExecutor::Init() {
 
   cursor_ = 0;
   rows_ = 0;
-  TableInfo * table_info_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid());
+  TableInfo * table_info = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid());
+  std::vector<IndexInfo *> table_indexes= exec_ctx_->GetCatalog()->GetTableIndexes(table_info->name_);
 
   Tuple tuple;
   RID rid;
   
   while (child_executor_->Next(&tuple, &rid)) {
-    bool deleted = table_info_->table_->MarkDelete(rid, exec_ctx_->GetTransaction());
+    bool deleted = table_info->table_->MarkDelete(rid, exec_ctx_->GetTransaction());
     if(deleted){
+      for(IndexInfo *index_info : table_indexes){
+        BPlusTreeIndexForOneIntegerColumn *index = dynamic_cast<BPlusTreeIndexForOneIntegerColumn *>(index_info->index_.get());
+        index->DeleteEntry(tuple.KeyFromTuple(table_info->schema_, *index->GetKeySchema(), index->GetKeyAttrs()), rid, exec_ctx_->GetTransaction());
+      }
       ++rows_;
     }
   }
