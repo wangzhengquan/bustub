@@ -228,7 +228,7 @@ auto BufferPoolManagerInstance::DeletePgImp(page_id_t page_id) -> bool {
   free_list_.push_back(frame_id);
   lock.unlock();
   
-  // page.pin_count_ = 0;
+  page.pin_count_ = 0;
   page.is_dirty_ = false;
   page.ClearAccessHistory();
   page.WLatch();

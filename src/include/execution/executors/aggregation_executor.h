@@ -45,8 +45,8 @@ class SimpleAggregationHashTable {
   /** @return The initial aggregrate value for this aggregation executor */
   auto GenerateInitialAggregateValue() -> AggregateValue {
     std::vector<Value> values{};
-    for (const auto &agg_type : agg_types_) {
-      switch (agg_type) {
+    for (uint32_t i = 0; i < agg_types_.size(); i++) {
+      switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
           // Count start starts at zero.
           values.emplace_back(ValueFactory::GetIntegerValue(0));
@@ -56,7 +56,7 @@ class SimpleAggregationHashTable {
         case AggregationType::MinAggregate:
         case AggregationType::MaxAggregate:
           // Others starts at null.
-          values.emplace_back(ValueFactory::GetNullValueByType(TypeId::INTEGER));
+          values.emplace_back(ValueFactory::GetNullValueByType(agg_exprs_[i]->GetReturnType()));
           break;
       }
     }
@@ -71,13 +71,48 @@ class SimpleAggregationHashTable {
    * @param input The input value
    */
   void CombineAggregateValues(AggregateValue *result, const AggregateValue &input) {
-    for (uint32_t i = 0; i < agg_exprs_.size(); i++) {
+    for (uint32_t i = 0; i < agg_types_.size(); i++) {
+      
       switch (agg_types_[i]) {
         case AggregationType::CountStarAggregate:
+          result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+          break;
         case AggregationType::CountAggregate:
+          if(input.aggregates_[i].IsNull()){
+            
+          } else if(result->aggregates_[i].IsNull()){
+            result->aggregates_[i] = ValueFactory::GetIntegerValue(1);
+          } else {
+            result->aggregates_[i] = result->aggregates_[i].Add(ValueFactory::GetIntegerValue(1));
+          }
+          break;
+          
         case AggregationType::SumAggregate:
+          if(input.aggregates_[i].IsNull()){
+          }
+          else if(result->aggregates_[i].IsNull()){
+            result->aggregates_[i] = input.aggregates_[i];
+          } else {
+            result->aggregates_[i] = result->aggregates_[i].Add(input.aggregates_[i]);
+          }  
+          break;
         case AggregationType::MinAggregate:
+          if(input.aggregates_[i].IsNull()){
+          }
+          else if(result->aggregates_[i].IsNull()){
+            result->aggregates_[i] = input.aggregates_[i];
+          } else if(input.aggregates_[i].CompareLessThan(result->aggregates_[i]) == CmpBool::CmpTrue) {
+            result->aggregates_[i] = input.aggregates_[i];
+          }  
+          break;
         case AggregationType::MaxAggregate:
+          if(input.aggregates_[i].IsNull()){
+          }
+          else if(result->aggregates_[i].IsNull()){
+            result->aggregates_[i] = input.aggregates_[i];
+          } else if(input.aggregates_[i].CompareGreaterThan(result->aggregates_[i]) == CmpBool::CmpTrue) {
+            result->aggregates_[i] = input.aggregates_[i];
+          }  
           break;
       }
     }
@@ -90,9 +125,25 @@ class SimpleAggregationHashTable {
    */
   void InsertCombine(const AggregateKey &agg_key, const AggregateValue &agg_val) {
     if (ht_.count(agg_key) == 0) {
-      ht_.insert({agg_key, GenerateInitialAggregateValue()});
+      // ht_.insert({agg_key, agg_val});
+       ht_.insert({agg_key, GenerateInitialAggregateValue()});
     }
     CombineAggregateValues(&ht_[agg_key], agg_val);
+
+    // std::cout << "group_bys_: ";
+    // for(auto & val: agg_key.group_bys_){
+    //   std::cout << val.ToString() << ", ";
+    // }
+    // std::cout << std::endl;
+    // for(auto & val: agg_val.aggregates_){
+    //   std::cout << val.ToString() << ", ";
+    // }
+    // std::cout << std::endl;
+    
+  }
+
+  auto GetHashTable() -> std::unordered_map<AggregateKey, AggregateValue> &{
+    return ht_;
   }
 
   /**
@@ -103,8 +154,9 @@ class SimpleAggregationHashTable {
   /** An iterator over the aggregation hash table */
   class Iterator {
    public:
+    explicit Iterator(){}
     /** Creates an iterator for the aggregate map. */
-    explicit Iterator(std::unordered_map<AggregateKey, AggregateValue>::const_iterator iter) : iter_{iter} {}
+    explicit Iterator(const std::unordered_map<AggregateKey, AggregateValue>::const_iterator& iter) : iter_{iter} {}
 
     /** @return The key of the iterator */
     auto Key() -> const AggregateKey & { return iter_->first; }
@@ -201,8 +253,8 @@ class AggregationExecutor : public AbstractExecutor {
   /** The child executor that produces tuples over which the aggregation is computed */
   std::unique_ptr<AbstractExecutor> child_;
   /** Simple aggregation hash table */
-  // TODO(Student): Uncomment SimpleAggregationHashTable aht_;
+  SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator */
-  // TODO(Student): Uncomment SimpleAggregationHashTable::Iterator aht_iterator_;
+  SimpleAggregationHashTable::Iterator cursor_;
 };
 }  // namespace bustub
