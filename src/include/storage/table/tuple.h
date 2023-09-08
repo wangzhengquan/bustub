@@ -18,6 +18,7 @@
 #include "catalog/schema.h"
 #include "common/rid.h"
 #include "type/value.h"
+#include "type/value_factory.h"
 
 namespace bustub {
 
@@ -40,7 +41,7 @@ class Tuple {
   explicit Tuple(RID rid) : rid_(rid) {}
 
   // constructor for creating a new tuple based on input value
-  Tuple(std::vector<Value> values, const Schema *schema);
+  Tuple(const std::vector<Value> &values, const Schema *schema);
 
   // copy constructor, deep copy
   Tuple(const Tuple &other);
@@ -85,6 +86,30 @@ class Tuple {
   inline auto IsAllocated() -> bool { return allocated_; }
 
   auto ToString(const Schema *schema) const -> std::string;
+
+  static auto Join(const Tuple *left_tuple, const Schema &left_schema, const Tuple *right_tuple, const Schema &right_schema, const Schema &schema) -> Tuple {
+    // Tuple tuple;
+    std::vector<Value> values;
+    uint32_t left_column_count = left_schema.GetColumnCount();
+    uint32_t right_column_count = right_schema.GetColumnCount();
+    uint32_t column_count = left_column_count + right_column_count;
+    values.reserve(column_count);
+    for(uint32_t i = 0; i < left_column_count; i++){
+      values.emplace_back(left_tuple->GetValue(&left_schema, i));
+    }
+
+    if(right_tuple != nullptr) {
+      for(uint32_t i = 0; i < right_column_count; i++){
+        values.emplace_back(right_tuple->GetValue(&right_schema, i));
+      }
+    } else {
+      for(uint32_t i = 0; i < right_column_count; i++){
+        values.emplace_back(ValueFactory::GetNullValueByType(right_schema.GetColumn(i).GetType()));
+      }
+    }
+    
+    return {values, &schema};
+  }
 
  private:
   // Get the starting storage address of specific column

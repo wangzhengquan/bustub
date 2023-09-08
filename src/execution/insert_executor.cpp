@@ -25,8 +25,6 @@ void InsertExecutor::Init() {
   child_executor_->Init();
   cursor_ = 0;
   rows_ = 0;
-
- 
   
   TableInfo * table_info = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid());
   std::vector<IndexInfo *> table_indexes= exec_ctx_->GetCatalog()->GetTableIndexes(table_info->name_);
