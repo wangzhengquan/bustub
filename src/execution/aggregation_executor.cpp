@@ -25,6 +25,7 @@ void AggregationExecutor::Init() {
   child_->Init();
   Tuple tuple;
   RID rid;
+  aht_.Clear();
   
   while (child_->Next(&tuple, &rid)) {
      AggregateKey key = MakeAggregateKey(&tuple);
