@@ -25,10 +25,10 @@ void SortExecutor::Init() {
       Value v2 = order_exp->Evaluate(&tuple2, GetOutputSchema());
 
       if(v1.CompareLessThan(v2) == CmpBool::CmpTrue){
-        return order_type == OrderByType::ASC ? true : false;
+        return order_type == OrderByType::DESC ? false : true;
       } 
       else if(v1.CompareGreaterThan(v2) == CmpBool::CmpTrue){
-        return order_type == OrderByType::ASC ? false : true;
+        return order_type == OrderByType::DESC ? true : false;
       }
       else if(v1.CompareEquals(v2) == CmpBool::CmpTrue) {
         continue;

@@ -20,6 +20,7 @@
 #include "execution/plans/seq_scan_plan.h"
 #include "execution/plans/topn_plan.h"
 #include "storage/table/tuple.h"
+#include <queue>
 
 namespace bustub {
 
@@ -50,7 +51,44 @@ class TopNExecutor : public AbstractExecutor {
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 
  private:
+  class OrderByCompare {
+  public:
+    const TopNPlanNode *plan_;
+    
+    explicit OrderByCompare(const TopNPlanNode *plan) : 
+             plan_(plan) {};
+
+    bool operator() (const Tuple &tuple1, const Tuple &tuple2) const { 
+      for(auto & order : plan_->GetOrderBy()) {
+        OrderByType order_type = order.first;
+        AbstractExpressionRef order_exp = order.second;
+        Value v1 = order_exp->Evaluate(&tuple1, plan_->OutputSchema());
+        Value v2 = order_exp->Evaluate(&tuple2, plan_->OutputSchema());
+
+        if(v1.CompareLessThan(v2) == CmpBool::CmpTrue){
+          return order_type == OrderByType::DESC ? false : true; 
+        } 
+        else if(v1.CompareGreaterThan(v2) == CmpBool::CmpTrue){
+          return order_type == OrderByType::DESC ? true : false;
+        }
+        else if(v1.CompareEquals(v2) == CmpBool::CmpTrue) {
+          continue;
+        } else {
+          return false;
+        }
+      }
+      return false;
+    }
+  } ;
+
   /** The topn plan node to be executed */
   const TopNPlanNode *plan_;
+  std::unique_ptr<AbstractExecutor> child_executor_;
+
+  std::priority_queue<Tuple, std::vector<Tuple>, OrderByCompare> priority_queue;
+  std::vector<Tuple> tuples_;
+  std::vector<Tuple>::iterator cursor_;
+
 };
+
 }  // namespace bustub
