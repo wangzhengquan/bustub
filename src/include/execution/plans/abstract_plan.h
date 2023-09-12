@@ -32,7 +32,7 @@ namespace bustub {
 
 /** PlanType represents the types of plans that we have in our system. */
 enum class PlanType {
-  SeqScan,
+  SeqScan ,
   IndexScan,
   Insert,
   Update,
@@ -49,6 +49,8 @@ enum class PlanType {
   TopN,
   MockScan
 };
+
+ 
 
 class AbstractPlanNode;
 using AbstractPlanNodeRef = std::shared_ptr<const AbstractPlanNode>;
@@ -83,6 +85,45 @@ class AbstractPlanNode {
 
   /** @return the type of this plan node */
   virtual auto GetType() const -> PlanType = 0;
+
+  auto GetTypeString() const -> std::string {
+    switch (GetType()) {
+      case PlanType::SeqScan:
+        return "SeqScan";
+      case PlanType::IndexScan:
+        return "IndexScan";
+      case PlanType::Insert:
+        return "Insert";
+      case PlanType::Update:
+        return "Update";
+      case PlanType::Delete:
+        return "Delete";
+      case PlanType::Aggregation:
+        return "Aggregation";
+      case PlanType::Limit:
+        return "Limit";
+      case PlanType::NestedLoopJoin:
+        return "NestedLoopJoin";
+      case PlanType::NestedIndexJoin:
+        return "NestedIndexJoin";
+      case PlanType::HashJoin:
+        return "HashJoin";
+      case PlanType::Filter:
+        return "Filter";
+      case PlanType::Values:
+        return "Values";
+      case PlanType::Projection:
+        return "Projection";
+      case PlanType::Sort:
+        return "Sort";
+      case PlanType::TopN:
+        return "TopN";
+      case PlanType::MockScan:
+        return "MockScan";
+
+    }
+    return "unknown";
+  }
 
   /** @return the string representation of the plan node and its children */
   auto ToString(bool with_schema = true) const -> std::string {

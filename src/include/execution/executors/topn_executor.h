@@ -21,6 +21,7 @@
 #include "execution/plans/topn_plan.h"
 #include "storage/table/tuple.h"
 #include <queue>
+#include <deque>
 
 namespace bustub {
 
@@ -86,8 +87,8 @@ class TopNExecutor : public AbstractExecutor {
   std::unique_ptr<AbstractExecutor> child_executor_;
 
   std::priority_queue<Tuple, std::vector<Tuple>, OrderByCompare> priority_queue;
-  std::vector<Tuple> tuples_;
-  std::vector<Tuple>::iterator cursor_;
+  std::deque<Tuple> tuples_;
+  std::deque<Tuple>::iterator cursor_;
 
 };
 

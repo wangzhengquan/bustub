@@ -27,11 +27,11 @@ void TopNExecutor::Init() {
   }
 
   while(!priority_queue.empty()){
-    tuples_.push_back(priority_queue.top());
+    tuples_.push_front(priority_queue.top());
     priority_queue.pop();
   }
 
-  std::reverse(tuples_.begin(), tuples_.end());
+  // std::reverse(tuples_.begin(), tuples_.end());
 
   cursor_ = tuples_.begin();
   
