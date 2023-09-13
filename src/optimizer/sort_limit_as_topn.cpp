@@ -13,14 +13,12 @@ auto Optimizer::OptimizeSortLimitAsTopN(const AbstractPlanNodeRef &plan) -> Abst
     children.emplace_back(OptimizeSortLimitAsTopN(child));
   }
   auto optimized_plan = plan->CloneWithChildren(std::move(children));
-  // std::cout << "optimized_plan->GetType():" << optimized_plan->GetTypeString() << std::endl;
 
-  // Has exactly one child
-//  BUSTUB_ENSURE(optimized_plan->children_.size() == 1, "Limit with multiple children?? Impossible!");
-  if(optimized_plan->children_.size() == 1){
+  if(optimized_plan->GetType() == PlanType::Limit ){
+     BUSTUB_ENSURE(optimized_plan->children_.size() == 1, "OptimizeSortLimitAsTopN children_.size()!");
     const AbstractPlanNodeRef &child_plan = optimized_plan->children_[0];
 
-    if (optimized_plan->GetType() == PlanType::Limit && child_plan->GetType() == PlanType::Sort) {
+    if (child_plan->GetType() == PlanType::Sort) {
       const auto &limit_plan = dynamic_cast<const LimitPlanNode &>(*optimized_plan);
       const auto &sort_plan = dynamic_cast<const SortPlanNode &>(*child_plan);
 
