@@ -32,6 +32,7 @@ auto Optimizer::MatchIndex(const std::string &table_name, uint32_t index_key_idx
   return std::nullopt;
 }
 
+
 auto Optimizer::OptimizeNLJAsIndexJoin(const AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
   std::vector<AbstractPlanNodeRef> children;
   for (const auto &child : plan->GetChildren()) {
@@ -45,42 +46,49 @@ auto Optimizer::OptimizeNLJAsIndexJoin(const AbstractPlanNodeRef &plan) -> Abstr
     BUSTUB_ENSURE(nlj_plan.children_.size() == 2, "NLJ should have exactly 2 children.");
     // Check if expr is equal condition where one is for the left table, and one is for the right table.
     if (const auto *expr = dynamic_cast<const ComparisonExpression *>(&nlj_plan.Predicate()); expr != nullptr) {
+      // const ColumnValueExpression * left_expr, * right_expr;
       if (expr->comp_type_ == ComparisonType::Equal) {
         if (const auto *left_expr = dynamic_cast<const ColumnValueExpression *>(expr->children_[0].get());
             left_expr != nullptr) {
           if (const auto *right_expr = dynamic_cast<const ColumnValueExpression *>(expr->children_[1].get());
               right_expr != nullptr) {
+            if(left_expr->GetTupleIdx() == 1 && right_expr->GetTupleIdx() == 0){
+              std::swap(left_expr, right_expr);
+            }
+            
             // Ensure both exprs have tuple_id == 0
             auto left_expr_tuple_0 =
-                std::make_shared<ColumnValueExpression>(0, left_expr->GetColIdx(), left_expr->GetReturnType());
+                std::make_shared<ColumnValueExpression>(left_expr->GetTupleIdx(), left_expr->GetColIdx(), left_expr->GetReturnType());
             auto right_expr_tuple_0 =
-                std::make_shared<ColumnValueExpression>(0, right_expr->GetColIdx(), right_expr->GetReturnType());
+                std::make_shared<ColumnValueExpression>(right_expr->GetTupleIdx(), right_expr->GetColIdx(), right_expr->GetReturnType());
             // Now it's in form of <column_expr> = <column_expr>. Let's match an index for them.
 
             // Ensure right child is table scan
             if (nlj_plan.GetRightPlan()->GetType() == PlanType::SeqScan) {
               const auto &right_seq_scan = dynamic_cast<const SeqScanPlanNode &>(*nlj_plan.GetRightPlan());
-              if (left_expr->GetTupleIdx() == 0 && right_expr->GetTupleIdx() == 1) {
-                if (auto index = MatchIndex(right_seq_scan.table_name_, right_expr->GetColIdx());
-                    index != std::nullopt) {
-                  auto [index_oid, index_name] = *index;
-                  return std::make_shared<NestedIndexJoinPlanNode>(
-                      nlj_plan.output_schema_, nlj_plan.GetLeftPlan(), std::move(left_expr_tuple_0),
-                      right_seq_scan.GetTableOid(), index_oid, std::move(index_name), right_seq_scan.table_name_,
-                      right_seq_scan.output_schema_, nlj_plan.GetJoinType());
-                }
-              }
-              if (left_expr->GetTupleIdx() == 1 && right_expr->GetTupleIdx() == 0) {
-                if (auto index = MatchIndex(right_seq_scan.table_name_, left_expr->GetColIdx());
-                    index != std::nullopt) {
-                  auto [index_oid, index_name] = *index;
-                  return std::make_shared<NestedIndexJoinPlanNode>(
-                      nlj_plan.output_schema_, nlj_plan.GetLeftPlan(), std::move(right_expr_tuple_0),
-                      right_seq_scan.GetTableOid(), index_oid, std::move(index_name), right_seq_scan.table_name_,
-                      right_seq_scan.output_schema_, nlj_plan.GetJoinType());
-                }
+              if (auto index = MatchIndex(right_seq_scan.table_name_, right_expr->GetColIdx());
+                  index != std::nullopt) {
+                auto [index_oid, index_name] = *index;
+                return std::make_shared<NestedIndexJoinPlanNode>(
+                    nlj_plan.output_schema_, nlj_plan.GetLeftPlan(), std::move(left_expr_tuple_0),
+                    right_seq_scan.GetTableOid(), index_oid, std::move(index_name), right_seq_scan.table_name_,
+                    right_seq_scan.output_schema_, nlj_plan.GetJoinType());
               }
             }
+
+            if (nlj_plan.GetLeftPlan()->GetType() == PlanType::SeqScan) {
+              const auto &left_seq_scan = dynamic_cast<const SeqScanPlanNode &>(*nlj_plan.GetLeftPlan());
+              if (auto index = MatchIndex(left_seq_scan.table_name_, left_expr->GetColIdx());
+                  index != std::nullopt) {
+                auto [index_oid, index_name] = *index;
+                return std::make_shared<NestedIndexJoinPlanNode>(
+                    nlj_plan.output_schema_, nlj_plan.GetRightPlan(), std::move(right_expr_tuple_0),
+                    left_seq_scan.GetTableOid(), index_oid, std::move(index_name), left_seq_scan.table_name_,
+                    left_seq_scan.output_schema_, nlj_plan.GetJoinType());
+              }
+               
+            }
+
           }
         }
       }
@@ -89,5 +97,67 @@ auto Optimizer::OptimizeNLJAsIndexJoin(const AbstractPlanNodeRef &plan) -> Abstr
 
   return optimized_plan;
 }
+
+
+
+
+
+// auto Optimizer::OptimizeNLJAsIndexJoin2(const AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
+//   std::vector<AbstractPlanNodeRef> children;
+//   for (const auto &child : plan->GetChildren()) {
+//     children.emplace_back(OptimizeNLJAsIndexJoin(child));
+//   }
+//   auto optimized_plan = plan->CloneWithChildren(std::move(children));
+
+//   if (optimized_plan->GetType() == PlanType::NestedLoopJoin) {
+//     const auto &nlj_plan = dynamic_cast<const NestedLoopJoinPlanNode &>(*optimized_plan);
+//     // Has exactly two children
+//     BUSTUB_ENSURE(nlj_plan.children_.size() == 2, "NLJ should have exactly 2 children.");
+//     // Check if expr is equal condition where one is for the left table, and one is for the right table.
+//     if (const auto *expr = dynamic_cast<const ComparisonExpression *>(&nlj_plan.Predicate()); expr != nullptr) {
+//       if (expr->comp_type_ == ComparisonType::Equal) {
+//         if (const auto *left_expr = dynamic_cast<const ColumnValueExpression *>(expr->children_[0].get());
+//             left_expr != nullptr) {
+//           if (const auto *right_expr = dynamic_cast<const ColumnValueExpression *>(expr->children_[1].get());
+//               right_expr != nullptr) {
+//             // Ensure both exprs have tuple_id == 0
+//             auto left_expr_tuple_0 =
+//                 std::make_shared<ColumnValueExpression>(0, left_expr->GetColIdx(), left_expr->GetReturnType());
+//             auto right_expr_tuple_0 =
+//                 std::make_shared<ColumnValueExpression>(0, right_expr->GetColIdx(), right_expr->GetReturnType());
+//             // Now it's in form of <column_expr> = <column_expr>. Let's match an index for them.
+
+//             // Ensure right child is table scan
+//             if (nlj_plan.GetRightPlan()->GetType() == PlanType::SeqScan) {
+//               const auto &right_seq_scan = dynamic_cast<const SeqScanPlanNode &>(*nlj_plan.GetRightPlan());
+//               if (left_expr->GetTupleIdx() == 0 && right_expr->GetTupleIdx() == 1) {
+//                 if (auto index = MatchIndex(right_seq_scan.table_name_, right_expr->GetColIdx());
+//                     index != std::nullopt) {
+//                   auto [index_oid, index_name] = *index;
+//                   return std::make_shared<NestedIndexJoinPlanNode>(
+//                       nlj_plan.output_schema_, nlj_plan.GetLeftPlan(), std::move(left_expr_tuple_0),
+//                       right_seq_scan.GetTableOid(), index_oid, std::move(index_name), right_seq_scan.table_name_,
+//                       right_seq_scan.output_schema_, nlj_plan.GetJoinType());
+//                 }
+//               }
+//               if (left_expr->GetTupleIdx() == 1 && right_expr->GetTupleIdx() == 0) {
+//                 if (auto index = MatchIndex(right_seq_scan.table_name_, left_expr->GetColIdx());
+//                     index != std::nullopt) {
+//                   auto [index_oid, index_name] = *index;
+//                   return std::make_shared<NestedIndexJoinPlanNode>(
+//                       nlj_plan.output_schema_, nlj_plan.GetLeftPlan(), std::move(right_expr_tuple_0),
+//                       right_seq_scan.GetTableOid(), index_oid, std::move(index_name), right_seq_scan.table_name_,
+//                       right_seq_scan.output_schema_, nlj_plan.GetJoinType());
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+
+//   return optimized_plan;
+// }
 
 }  // namespace bustub

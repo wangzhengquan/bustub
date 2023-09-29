@@ -34,15 +34,15 @@ namespace bustub {
 class NestedIndexJoinPlanNode : public AbstractPlanNode {
  public:
   NestedIndexJoinPlanNode(SchemaRef output, AbstractPlanNodeRef child, AbstractExpressionRef key_predicate,
-                          table_oid_t inner_table_oid, index_oid_t index_oid, std::string index_name,
-                          std::string index_table_name, SchemaRef inner_table_schema, JoinType join_type)
+                          table_oid_t index_table_oid, index_oid_t index_oid, std::string index_name,
+                          std::string index_table_name, SchemaRef index_table_schema, JoinType join_type)
       : AbstractPlanNode(std::move(output), {std::move(child)}),
         key_predicate_(std::move(key_predicate)),
-        inner_table_oid_(inner_table_oid),
+        index_table_oid_(index_table_oid),
         index_oid_(index_oid),
         index_name_(std::move(index_name)),
         index_table_name_(std::move(index_table_name)),
-        inner_table_schema_(std::move(inner_table_schema)),
+        index_table_schema_(std::move(index_table_schema)),
         join_type_(join_type) {}
 
   auto GetType() const -> PlanType override { return PlanType::NestedIndexJoin; }
@@ -57,7 +57,7 @@ class NestedIndexJoinPlanNode : public AbstractPlanNode {
   auto GetChildPlan() const -> AbstractPlanNodeRef { return GetChildAt(0); }
 
   /** @return the table oid for the inner table of the nested index join */
-  auto GetInnerTableOid() const -> table_oid_t { return inner_table_oid_; }
+  auto GetIndexTableOid() const -> table_oid_t { return index_table_oid_; }
 
   /** @return the index associated with the nested index join */
   auto GetIndexName() const -> std::string { return index_name_; }
@@ -66,17 +66,17 @@ class NestedIndexJoinPlanNode : public AbstractPlanNode {
   auto GetIndexOid() const -> index_oid_t { return index_oid_; }
 
   /** @return Schema with needed columns in from the inner table */
-  auto InnerTableSchema() const -> const Schema & { return *inner_table_schema_; }
+  auto IndexTableSchema() const -> const Schema & { return *index_table_schema_; }
 
   BUSTUB_PLAN_NODE_CLONE_WITH_CHILDREN(NestedIndexJoinPlanNode);
 
   /** The nested index join predicate. */
   AbstractExpressionRef key_predicate_;
-  table_oid_t inner_table_oid_;
+  table_oid_t index_table_oid_;
   index_oid_t index_oid_;
   const std::string index_name_;
   const std::string index_table_name_;
-  SchemaRef inner_table_schema_;
+  SchemaRef index_table_schema_;
 
   /** The join type */
   JoinType join_type_;

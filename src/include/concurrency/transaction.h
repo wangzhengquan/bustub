@@ -47,7 +47,7 @@ enum class TransactionState { GROWING, SHRINKING, COMMITTED, ABORTED };
 /**
  * Transaction isolation level.
  */
-enum class IsolationLevel { READ_UNCOMMITTED, REPEATABLE_READ, READ_COMMITTED };
+enum class IsolationLevel { SERIALIZABLE, REPEATABLE_READ, READ_COMMITTED, READ_UNCOMMITTED };
 
 /**
  * Type of write operation.
