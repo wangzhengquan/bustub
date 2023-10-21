@@ -59,6 +59,10 @@ class LockManager {
     RID rid_;
     /** Whether the lock has been granted or not */
     bool granted_{false};
+
+    auto operator==(const LockRequest &other) const -> bool { 
+      return txn_id_ == other.txn_id_ && oid_ == other.oid_ && rid_ == other.rid_; 
+    }
   };
 
   class LockRequestQueue {
@@ -298,22 +302,29 @@ class LockManager {
   auto RunCycleDetection() -> void;
 
  private:
+  void InsertRIDIntoTransactionLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid,  const RID &rid);
+  void RemoveRIDFromTransactionLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid,  const RID &rid);
+  void InsertTableOidIntoTransactionLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid);
+  void RemoveTableOidFromTransactionLockSet(Transaction *txn, LockMode lock_mode, const table_oid_t &oid);
+  auto IsCompatible(const LockRequest &request, const std::list<LockRequest *>  &request_queue) ->  bool;
+  auto Compare(const LockMode &a, const LockMode &b) ->  int;
+  auto IsCompatible(const LockMode &a, const LockMode &b) ->  bool ;
   /** Fall 2022 */
   /** Structure that holds lock requests for a given table oid */
   std::unordered_map<table_oid_t, std::shared_ptr<LockRequestQueue>> table_lock_map_;
   /** Coordination */
-  std::mutex table_lock_map_latch_;
+  std::mutex table_lock_map_mutex_;
 
   /** Structure that holds lock requests for a given RID */
   std::unordered_map<RID, std::shared_ptr<LockRequestQueue>> row_lock_map_;
   /** Coordination */
-  std::mutex row_lock_map_latch_;
+  std::mutex row_lock_map_mutex_;
 
   std::atomic<bool> enable_cycle_detection_;
   std::thread *cycle_detection_thread_;
   /** Waits-for graph representation. */
   std::unordered_map<txn_id_t, std::vector<txn_id_t>> waits_for_;
-  std::mutex waits_for_latch_;
+  std::mutex waits_for_mutex_;
 };
 
 }  // namespace bustub
